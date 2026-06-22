@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Configurações - Admin</title>
+    <link rel="stylesheet" href="css/admin.css">
+</head>
+<body>
+
+    <h1>Configurações do Sistema</h1>
+
+    <form id="configForm">
+        <div>
+            <label for="nomeSistema">Nome do Sistema:</label>
+            <input type="text" id="nomeSistema" name="nomeSistema">
+        </div>
+
+        <div>
+            <label for="emailSuporte">E-mail de Suporte:</label>
+            <input type="email" id="emailSuporte" name="emailSuporte">
+        </div>
+
+        <div>
+            <label>
+                <input type="checkbox" id="manutencao">
+                Modo de manutenção
+            </label>
+        </div>
+
+        <button type="submit">Salvar Configurações</button>
+    </form>
+
+    <script src="js/configuracoes.js"></script>
+</body>
+</html>
