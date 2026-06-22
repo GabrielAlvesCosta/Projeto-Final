@@ -1,0 +1,136 @@
+/* --- GERAL E VARIÁVEIS DE COR --- */
+:root {
+    --dark-blue: #1A237E;
+    --secondary-blue: #004D7A;
+    --accent-gold: #FFB300;
+}
+
+body {
+    font-family: 'Montserrat', sans-serif;
+}
+
+/* --- CLASSES DE COR CUSTOMIZADAS --- */
+.bg-dark-blue { background-color: var(--dark-blue) !important; }
+.bg-secondary-blue { background-color: var(--secondary-blue) !important; }
+.text-dark-blue { color: var(--dark-blue) !important; }
+
+/* --- AJUSTES DE COMPONENTES BOOTSTRAP --- */
+
+/* Logo */
+.logo {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--dark-blue);
+}
+.logo strong {
+    color: var(--accent-gold);
+}
+
+/* Botão Primário (Amarelo/Dourado) */
+.btn-primary {
+    background-color: var(--accent-gold);
+    border-color: var(--accent-gold);
+    color: var(--dark-blue);
+    font-weight: 600;
+}
+.btn-primary:hover, .btn-primary:focus {
+    background-color: #ffc107;
+    border-color: #ffc107;
+    color: var(--dark-blue);
+    box-shadow: 0 4px 10px rgba(0,0,0,0.15);
+}
+
+/* Botão Secundário (Vazado Azul) */
+.btn-secondary {
+    background-color: transparent;
+    border-color: var(--dark-blue);
+    color: var(--dark-blue);
+    font-weight: 600;
+}
+.btn-secondary:hover, .btn-secondary:focus {
+    background-color: var(--dark-blue);
+    border-color: var(--dark-blue);
+    color: #fff;
+}
+
+/* Badge de Destaque */
+.highlight-badge {
+    background-color: var(--accent-gold);
+    color: var(--dark-blue);
+    font-size: 0.75rem;
+    font-weight: 700;
+}
+
+/* Links do Header */
+.main-header .nav-link {
+    font-weight: 600;
+    color: #555;
+}
+.main-header .login-btn {
+    font-weight: 600;
+    color: var(--dark-blue);
+}
+
+/* Efeito Hover nos Cards */
+.card-hover {
+    transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+.card-hover:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 8px 25px rgba(0,0,0,0.1) !important;
+}
+
+/* Links dentro dos Modais */
+#mostrarCriarLink, #mostrarEntrarLink {
+    cursor: pointer;
+    text-decoration: underline;
+    color: var(--dark-blue);
+    font-size: 0.9rem;
+}
+
+/* Estilo das setas */
+.btn-navegacao {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border: none;
+}
+        
+.btn-navegacao:hover:not(:disabled) {
+    transform: scale(1.1);
+    background-color: #0d6efd !important;
+}
+
+/* Container do Grid com overflow escondido para o slide não vazar */
+#container-carrossel {
+    overflow: hidden;
+    position: relative;
+    min-height: 450px; /* Mantém altura para evitar pulos na tela */
+}
+
+/* ANIMAÇÕES DE SLIDE */
+        
+/* Quando vamos para a PRÓXIMA (entra da direita para esquerda) */
+@keyframes slideInFromRight {
+    from { transform: translateX(50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+/* Quando voltamos para a ANTERIOR (entra da esquerda para direita) */
+@keyframes slideInFromLeft {
+    from { transform: translateX(-50px); opacity: 0; }
+    to { transform: translateX(0); opacity: 1; }
+}
+
+.slide-proxima {
+    animation: slideInFromRight 0.65s ease-out forwards;
+}
+
+.slide-anterior {
+    animation: slideInFromLeft 0.65s ease-out backwards;
+}
