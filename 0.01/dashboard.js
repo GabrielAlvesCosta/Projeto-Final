@@ -114,17 +114,35 @@ let linhaSendoEditada = null;
 
 function renderizarTabelaServicos() {
     const tabela = document.getElementById('tabelaMeusServicos');
-    if (!tabela) return; // Se não achar a tabela, para aqui para não travar o JS
+    if (!tabela) return; 
 
     const todosOsAnuncios = JSON.parse(localStorage.getItem('maquinaria_anuncios')) || [];
+    
+    // ====== NOVO: PEGA O TERMO DIGITADO NA BUSCA ======
+    const inputBusca = document.getElementById('buscaTitulo');
+    const termoBusca = inputBusca ? inputBusca.value.toLowerCase().trim() : '';
+    // ==================================================
+
     tabela.innerHTML = '';
 
-    if (todosOsAnuncios.length === 0) {
-        tabela.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">Nenhum serviço anunciado no sistema.</td></tr>`;
+    // ====== NOVO: FILTRA OS ANÚNCIOS PELO TÍTULO ======
+    const anunciosFiltrados = todosOsAnuncios.filter(anuncio => {
+        const titulo = anuncio.titulo ? anuncio.titulo.toLowerCase() : '';
+        return titulo.includes(termoBusca);
+    });
+    // ==================================================
+
+    // Mensagem caso esteja vazio ou a busca não ache nada
+    if (anunciosFiltrados.length === 0) {
+        const mensagem = termoBusca 
+            ? 'Nenhum serviço encontrado com este título.' 
+            : 'Nenhum serviço anunciado no sistema.';
+        tabela.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">${mensagem}</td></tr>`;
         return;
     }
 
-    todosOsAnuncios.forEach(anuncio => {
+    // Renderiza apenas os anúncios que passaram pelo filtro
+    anunciosFiltrados.forEach(anuncio => {
         let corBadgeRel = obtenerClasseRelevancia(anuncio.relevancia || 'Normal');
         let corBadgeStatus = obtenerClasseStatus(anuncio.status || 'Ativo'); 
         const subtitulo = anuncio.tipo === 'maquina' ? `Máquinas > ${anuncio.categoria}` : `Operador > ${anuncio.categoria}`;
@@ -318,22 +336,25 @@ function previewFotoEdicao(input) {
 // INICIALIZAÇÃO SEGURA (Prevenindo quebra de script)
 // ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Tenta carregar o perfil
     try {
         carregarDadosPerfil();
     } catch(e) { console.warn("Erro não crítico ao carregar perfil:", e); }
     
-    // 2. Tenta carregar as categorias
     try {
         atualizarCategorias('catNovo', 'maquina');
     } catch(e) { console.warn("Erro não crítico ao atualizar categorias:", e); }
     
-    // 3. Renderiza a tabela (agora não será bloqueada se algo acima falhar!)
     try {
         renderizarTabelaServicos(); 
     } catch(e) { console.error("Erro ao renderizar tabela de serviços:", e); }
 
-    // 4. Configura o gatilho da aba
+    // ====== NOVO: SINALIZA PARA A TABELA ATUALIZAR ENQUANTO DIGITA ======
+    const inputBusca = document.getElementById('buscaTitulo');
+    if (inputBusca) {
+        inputBusca.addEventListener('input', renderizarTabelaServicos);
+    }
+    // ====================================================================
+
     const botaoAbaServicos = document.getElementById('tab-meus-servicos');
     if (botaoAbaServicos) {
         botaoAbaServicos.addEventListener('shown.bs.tab', renderizarTabelaServicos);
