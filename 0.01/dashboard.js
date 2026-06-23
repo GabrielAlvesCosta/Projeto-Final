@@ -1,175 +1,165 @@
-// ==========================================
-// FUNÇÕES DE PERFIL E AUXILIARES
-// ==========================================
-function previewFoto(input) {
+
+        (function() {
+            // Verifica se existe o token de login no navegador
+            const usuarioLogado = localStorage.getItem('loggedInUserCPF');
+            
+            if (!usuarioLogado) {
+                // Se NÃO estiver logado, redireciona IMEDIATAMENTE para a tela de login
+                // Usamos .replace() para que o usuário não consiga voltar usando a seta "Voltar" do navegador
+                window.location.replace('login.html');
+            }
+        })();
+// ====================================================================
+// dashboard.js - GESTÃO DE PRONTUÁRIOS ELETRÔNICOS (PEP)
+// ====================================================================
+
+function previewCarimbo(input) {
+    const preview = document.getElementById('prontuarioCarimboPreview');
     if (input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
-            document.getElementById('perfilFoto').src = e.target.result;
+            preview.src = e.target.result;
+            preview.classList.remove('d-none');
         }
         reader.readAsDataURL(input.files[0]);
+    } else {
+        preview.src = "";
+        preview.classList.add('d-none');
     }
 }
 
-function adicionarCampo(containerId, tipo) {
-    const container = document.getElementById(containerId);
-    if (!container) return;
-    const placeholder = tipo === 'tel' ? '(00) 00000-0000' : 'Endereço completo';
-    const div = document.createElement('div');
-    div.className = 'dynamic-field';
-    div.innerHTML = `
-        <input type="text" class="form-control" placeholder="${placeholder}">
-        <button type="button" class="btn btn-outline-danger border-0" onclick="removerCampo(this)"><i class="bi bi-trash"></i></button>
-    `;
-    container.appendChild(div);
-}
-
-function removerCampo(btn) {
-    if (btn && btn.closest('.dynamic-field')) {
-        btn.closest('.dynamic-field').remove();
+function previewFoto(input) {
+    if (input.files && input.files[0]) {
+        const reader = new FileReader();
+        reader.onload = function(e) { document.getElementById('perfilFoto').src = e.target.result; }
+        reader.readAsDataURL(input.files[0]);
     }
 }
 
 function carregarDadosPerfil() {
     let user = null;
-
     if (typeof DB !== 'undefined' && typeof DB.getUsuarioLogado === 'function') {
         user = DB.getUsuarioLogado();
-    } 
-    
+    }
     if (!user) {
         const cpfLogado = localStorage.getItem('loggedInUserCPF');
         if (cpfLogado) {
-            const dadosUsuario = localStorage.getItem(cpfLogado);
-            if (dadosUsuario) {
-                try {
-                    user = JSON.parse(dadosUsuario);
-                } catch(e) {
-                    console.error("Erro ao ler os dados:", e);
-                }
-            }
+            const dados = localStorage.getItem(cpfLogado);
+            if (dados) { try { user = JSON.parse(dados); } catch(e){} }
         }
     }
-
     if (user) {
         const display = document.getElementById('user-display-name');
-        if (display) display.textContent = user.nome ? user.nome.split(' ')[0] : 'Usuário';
-        
-        const pNome = document.getElementById('perfilNome');
-        if (pNome) pNome.value = user.nome || '';
-        
-        const pEmail = document.getElementById('perfilEmail');
-        if (pEmail) pEmail.value = user.email || '';
-        
-        const pCpf = document.getElementById('perfilCPF');
-        if (pCpf) pCpf.value = user.cpf || '';
-
-        // ====== NOVO: CARREGA A FOTO DE PERFIL ======
-        const fotoPerfil = document.getElementById('perfilFoto');
-        if (fotoPerfil) {
-            // Se o usuário já salvou uma foto, exibe ela. Senão, mostra um avatar genérico.
-            fotoPerfil.src = user.foto || 'https://cdn-icons-png.flaticon.com/512/149/149071.png';
-        }
-        // ============================================
-        
-    } else {
-        console.warn("Nenhum usuário logado encontrado.");
+        if (display) display.textContent = user.nome ? "Profissional: " + user.nome.split(' ')[0] : 'Profissional';
+        if (document.getElementById('perfilNome')) document.getElementById('perfilNome').value = user.nome || '';
+        if (document.getElementById('perfilEmail')) document.getElementById('perfilEmail').value = user.email || '';
+        if (document.getElementById('perfilCPF')) document.getElementById('perfilCPF').value = user.cpf || '';
+        if (document.getElementById('perfilFoto') && user.foto) document.getElementById('perfilFoto').src = user.foto;
     }
 }
 
 function salvarPerfil() {
-    alert("Alterações do perfil salvas com sucesso!");
-    // Aqui você pode integrar com o seu DB.js futuramente
+    const cpfLogado = localStorage.getItem('loggedInUserCPF');
+    if (!cpfLogado) return alert("Erro de sessão do profissional.");
+
+    let user = JSON.parse(localStorage.getItem(cpfLogado)) || {};
+    user.nome = document.getElementById('perfilNome').value;
+    user.email = document.getElementById('perfilEmail').value;
+    user.foto = document.getElementById('perfilFoto').src;
+
+    localStorage.setItem(cpfLogado, JSON.stringify(user));
+    carregarDadosPerfil();
+    alert("Dados atualizados com sucesso!");
 }
 
-function actualizarCategorias(targetId, tipo) {
-    const select = document.getElementById(targetId);
-    if (!select) return;
-
-    const catsMaquina = ['Escavadeiras', 'Guindastes', 'Caminhões', 'Compactadores'];
-    const catsOperador = ['Op. de Escavadeira', 'Op. de Guindaste', 'Motorista de Caminhão'];
-    
-    const lista = (tipo === 'maquina') ? catsMaquina : catsOperador;
-    select.innerHTML = lista.map(c => `<option value="${c}">${c}</option>`).join('');
+function buscarTodosDoBanco() {
+    if (typeof DB !== 'undefined') {
+        if (typeof DB.buscarTodos === 'function') return DB.buscarTodos();
+        if (typeof DB.listar === 'function') return DB.listar();
+        if (typeof DB.obterTodos === 'function') return DB.obterTodos();
+    }
+    const locais = localStorage.getItem('bancoProntuarios');
+    return locais ? JSON.parse(locais) : [];
 }
 
-function obtenerClasseRelevancia(relevancia) {
-    if (relevancia === 'Alta') return 'bg-info-subtle text-info';
-    if (relevancia === 'Muito Alto') return 'bg-warning-subtle text-warning';
-    if (relevancia === 'Premium') return 'bg-danger-subtle text-danger';
-    if (relevancia === 'Principal') return 'bg-primary-subtle text-primary';
-    if (relevancia === 'Principal Premium') return 'bg-dark text-white';
-    return 'bg-secondary-subtle text-secondary'; 
+function salvarNoBancoUnificado(novoProntuario, listaCompleta) {
+    localStorage.setItem('bancoProntuarios', JSON.stringify(listaCompleta));
+    if (typeof DB !== 'undefined') {
+        try {
+            if (typeof DB.salvarProntuario === 'function') DB.salvarProntuario(novoProntuario);
+            else if (typeof DB.salvar === 'function') DB.salvar(novoProntuario);
+            else if (typeof DB.adicionar === 'function') DB.adicionar(novoProntuario);
+        } catch (err) {
+            console.warn("db.js encontrou um descompasso estrutural, mas o dado local está seguro.", err);
+        }
+    }
 }
 
-function obtenerClasseStatus(status) {
-    if (status === 'Em Uso') return 'bg-warning text-dark';
-    return 'bg-success-subtle text-success'; 
+function obterClassePrioridade(prioridade) {
+    if (prioridade === 'Urgente') return 'bg-warning text-dark';
+    if (prioridade === 'Emergência') return 'bg-danger text-white';
+    return 'bg-success text-white';
 }
 
-// ==========================================
-// LÓGICA DE SERVIÇOS E TABELA
-// ==========================================
-let linhaSendoEditada = null; 
+function formatarDataBR(dataString) {
+    if (!dataString) return 'Não informada';
+    const partes = dataString.split('-');
+    if (partes.length !== 3) return dataString;
+    return `${partes[2]}/${partes[1]}/${partes[0]}`;
+}
 
-function renderizarTabelaServicos() {
-    const tabela = document.getElementById('tabelaMeusServicos');
-    if (!tabela) return; 
+function renderizarTabelaProntuarios() {
+    const tabela = document.getElementById('tabelaProntuarios');
+    if (!tabela) return;
 
-    const todosOsAnuncios = JSON.parse(localStorage.getItem('maquinaria_anuncios')) || [];
-    
-    // ====== NOVO: PEGA O TERMO DIGITADO NA BUSCA ======
-    const inputBusca = document.getElementById('buscaTitulo');
+    const todosOsProntuarios = buscarTodosDoBanco();
+    const inputBusca = document.getElementById('buscaPaciente');
     const termoBusca = inputBusca ? inputBusca.value.toLowerCase().trim() : '';
-    // ==================================================
 
     tabela.innerHTML = '';
 
-    // ====== NOVO: FILTRA OS ANÚNCIOS PELO TÍTULO ======
-    const anunciosFiltrados = todosOsAnuncios.filter(anuncio => {
-        const titulo = anuncio.titulo ? anuncio.titulo.toLowerCase() : '';
-        return titulo.includes(termoBusca);
+    const filtrados = todosOsProntuarios.filter(p => {
+        const nome = p.nomePaciente ? p.nomePaciente.toLowerCase() : '';
+        return nome.includes(termoBusca);
     });
-    // ==================================================
 
-    // Mensagem caso esteja vazio ou a busca não ache nada
-    if (anunciosFiltrados.length === 0) {
-        const mensagem = termoBusca 
-            ? 'Nenhum serviço encontrado com este título.' 
-            : 'Nenhum serviço anunciado no sistema.';
-        tabela.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">${mensagem}</td></tr>`;
+    if (filtrados.length === 0) {
+        const msg = termoBusca ? 'Nenhum paciente localizado com este nome.' : 'Nenhum prontuário registrado no sistema.';
+        tabela.innerHTML = `<tr><td colspan="4" class="text-center text-muted py-4">${msg}</td></tr>`;
         return;
     }
 
-    // Renderiza apenas os anúncios que passaram pelo filtro
-    anunciosFiltrados.forEach(anuncio => {
-        let corBadgeRel = obtenerClasseRelevancia(anuncio.relevancia || 'Normal');
-        let corBadgeStatus = obtenerClasseStatus(anuncio.status || 'Ativo'); 
-        const subtitulo = anuncio.tipo === 'maquina' ? `Máquinas > ${anuncio.categoria}` : `Operador > ${anuncio.categoria}`;
-        const fotoExibicao = (anuncio.imagem && anuncio.imagem.trim() !== '') ? anuncio.imagem : 'https://via.placeholder.com/70x50?text=Sem+Foto';
+    filtrados.forEach(p => {
+        let corPrioridade = obterClassePrioridade(p.prioridade);
+        const subInfo = `${p.tipoAtendimento} > ${p.convenioCartao || 'Sem convênio'}`;
+        
+        const imgCarimbo = (p.carimboAssinatura && p.carimboAssinatura !== '') 
+            ? p.carimboAssinatura 
+            : 'https://cdn-icons-png.flaticon.com/512/2965/2965879.png';
 
         const linhaHTML = `
-            <tr data-id="${anuncio.id}" data-titulo="${anuncio.titulo}" data-preco="${anuncio.preco}" data-tipo="${anuncio.tipo}" data-categoria="${anuncio.categoria}" data-relevancia="${anuncio.relevancia}" data-status="${anuncio.status || 'Ativo'}" data-img="${anuncio.imagem}" data-localizacao="${anuncio.local || ''}" data-descricao="${anuncio.descricao || ''}">
+            <tr data-id="${p.id}">
                 <td> 
                     <div class="d-flex align-items-center gap-3">
-                        <img src="${fotoExibicao}" class="rounded object-fit-cover shadow-sm" style="width: 80px; height: 60px; min-width: 80px;" alt="Imagem do serviço">
+                        <img src="${imgCarimbo}" class="rounded-circle object-fit-cover shadow-sm bg-white" style="width: 50px; height: 50px; min-width: 50px; border: 1px solid #dee2e6;">
                         <div>
-                            <h6 class="mb-1 fw-bold text-dark">${anuncio.titulo}</h6>
-                            <div class="text-muted small mb-1">${subtitulo}</div>
-                            <div class="text-muted small"><i class="bi bi-geo-alt-fill text-danger"></i> ${anuncio.local || 'Não informada'}</div>
+                            <h6 class="mb-1 fw-bold text-dark">${p.nomePaciente}</h6>
+                            <div class="text-muted small mb-1">${subInfo}</div>
                         </div>
                     </div>
                 </td>
                 <td>
-                    <span class="badge ${corBadgeStatus} mb-1 d-inline-block">${anuncio.status || 'Ativo'}</span><br>
-                    <span class="badge ${corBadgeRel} d-inline-block">${anuncio.relevancia}</span>
+                    <span class="badge bg-secondary mb-1">${p.especialidade}</span><br>
+                    <span class="badge ${corPrioridade}">${p.prioridade}</span>
                 </td>
-                <td class="fw-bold text-dark text-nowrap">
-                    R$ ${String(anuncio.preco).replace('.', ',')}
+                <td class="text-dark small align-middle">
+                    <strong>Nasc:</strong> ${formatarDataBR(p.dataNascimento)}<br>
+                    <span class="text-muted small">Gênero: ${p.genero || 'N/I'}</span>
                 </td>
-                <td class="text-end text-nowrap">
-                    <button class="btn btn-sm btn-outline-primary me-1" onclick="abrirEdicao(this)" title="Editar"><i class="bi bi-pencil"></i></button>
-                    <button class="btn btn-sm btn-outline-danger" onclick="excluirServico(this)" title="Excluir"><i class="bi bi-trash"></i></button>
+                <td class="text-end text-nowrap align-middle">
+                    <button class="btn btn-sm btn-outline-primary" onclick="abrirEdicaoProntuario(${p.id})" title="Abrir Prontuário Completo">
+                        <i class="bi bi-file-earmark-medical"></i> Abrir
+                    </button>
                 </td>
             </tr>
         `;
@@ -177,186 +167,146 @@ function renderizarTabelaServicos() {
     });
 }
 
-function excluirServico(botaoClicado) {
-    if (confirm("Tem certeza que deseja excluir este anúncio? Esta ação não pode ser desfeita.")) {
-        const tr = botaoClicado.closest('tr');
-        const idAnuncio = parseInt(tr.getAttribute('data-id'));
-        
-        if (idAnuncio) {
-            const todosAnuncios = JSON.parse(localStorage.getItem('maquinaria_anuncios')) || [];
-            const listaAtualizada = todosAnuncios.filter(a => a.id !== idAnuncio);
-            localStorage.setItem('maquinaria_anuncios', JSON.stringify(listaAtualizada));
-        }
-        
-        tr.remove();
-        renderizarTabelaServicos(); 
-    }
-}
+function publicarProntuario(event) {
+    event.preventDefault();
 
-function publicarServico(event) {
-    event.preventDefault(); 
+    let cpfMedico = localStorage.getItem('loggedInUserCPF') || 'anonimo';
+    const todos = buscarTodosDoBanco();
+    const proximoId = todos.length > 0 ? Math.max(...todos.map(p => p.id || 0)) + 1 : 1;
 
-    const titulo = document.getElementById('novoTitulo').value;
-    const precoRaw = document.getElementById('novoPreco').value;
-    const preco = parseFloat(precoRaw).toFixed(2);
-    const category = document.getElementById('catNovo').value;
-    const tipo = document.getElementById('tipoServico').value;
-    const relevancia = document.getElementById('relevanciaNovo').value; 
-    const localizacao = document.getElementById('novoLocalizacao').value;
-    const descricao = document.getElementById('novoDescricao').value;
-    const inputArquivo = document.getElementById('novoArquivo');
-    
-    let imgSrc = tipo === 'maquina' ? 'https://via.placeholder.com/70x50?text=Maq' : 'https://via.placeholder.com/70x50?text=Op';
+    const radioGenero = document.querySelector('input[name="prontuarioGenero"]:checked');
+    const generoSelecionado = radioGenero ? radioGenero.value : "Não informado";
 
-    const salvarNoBancoERenderizar = (imagemParaUsar) => {
-        const todosAnuncios = JSON.parse(localStorage.getItem('maquinaria_anuncios')) || [];
-        const proximoId = todosAnuncios.length > 0 ? Math.max(...todosAnuncios.map(a => a.id || 0)) + 1 : 1;
-        
-        let cpfDono = 'anonimo';
-        if (window.DB && typeof DB.getUsuarioLogado === 'function' && DB.getUsuarioLogado()) {
-            cpfDono = DB.getUsuarioLogado().cpf;
-        }
+    const carimboImg = document.getElementById('prontuarioCarimboPreview').src;
+    const carimboSalvar = carimboImg.startsWith('data:image') ? carimboImg : '';
 
-        const novoAnuncio = {
-            id: proximoId, titulo: titulo, preco: preco, tipo: tipo, categoria: category,
-            relevancia: relevancia, status: 'Ativo', imagem: imagemParaUsar, local: localizacao,
-            descricao: descricao, donoCPF: cpfDono
-        };
-
-        todosAnuncios.unshift(novoAnuncio);
-        localStorage.setItem('maquinaria_anuncios', JSON.stringify(todosAnuncios));
-
-        renderizarTabelaServicos();
-        alert("Parabéns! Seu serviço foi publicado com sucesso.");
-        document.getElementById('formNovoServico').reset();
-        atualizarCategorias('catNovo', 'maquina');
-        
-        // Retorna para a aba da tabela automaticamente
-        const tabEl = document.querySelector('#tab-meus-servicos');
-        if (tabEl) {
-            const tab = new bootstrap.Tab(tabEl);
-            tab.show();
-        }
+    const novoProntuario = {
+        id: proximoId,
+        nomePaciente: document.getElementById('prontuarioNome').value,
+        dataNascimento: document.getElementById('prontuarioDataNasc').value,
+        genero: generoSelecionado,
+        idadeAnos: document.getElementById('prontuarioIdadeAnos').value,
+        idadeMeses: document.getElementById('prontuarioIdadeMeses').value,
+        idadeDias: document.getElementById('prontuarioIdadeDias').value,
+        documento: document.getElementById('prontuarioDocumento').value,
+        convenioCartao: document.getElementById('prontuarioCartao').value,
+        acompanhante: document.getElementById('prontuarioAcompanhante').value,
+        especialidade: document.getElementById('prontuarioEspecialidade').value,
+        tipoAtendimento: document.getElementById('prontuarioTipoAtendimento').value,
+        prioridade: document.getElementById('prontuarioPrioridade').value,
+        registroProfissional: document.getElementById('prontuarioRegistroProfissional').value,
+        carimboAssinatura: carimboSalvar,
+        qp: document.getElementById('prontuarioQP').value,
+        hda: document.getElementById('prontuarioHDA').value,
+        hmp: document.getElementById('prontuarioHMP').value,
+        alergias: document.getElementById('prontuarioAlergias').value,
+        sinalPA: document.getElementById('prontuarioPA').value,
+        sinalFC: document.getElementById('prontuarioFC').value,
+        sinalFR: document.getElementById('prontuarioFR').value,
+        sinalTEMP: document.getElementById('prontuarioTEMP').value,
+        sinalSATO2: document.getElementById('prontuarioSATO2').value,
+        estadoGeral: document.getElementById('prontuarioEstadoGeral').value,
+        cardioResp: document.getElementById('prontuarioCardioResp').value,
+        neuroOutros: document.getElementById('prontuarioNeuroOutros').value,
+        hipotese: document.getElementById('prontuarioHipotese').value,
+        conduta: document.getElementById('prontuarioConduta').value,
+        medicoCPF: cpfMedico
     };
 
-    if (inputArquivo && inputArquivo.files && inputArquivo.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) { salvarNoBancoERenderizar(e.target.result); }
-        reader.readAsDataURL(inputArquivo.files[0]);
+    todos.unshift(novoProntuario);
+    salvarNoBancoUnificado(novoProntuario, todos);
+
+    alert("Prontuário clínico aberto e autenticado com sucesso!");
+
+    document.getElementById('formNovoProntuario').reset();
+    const preview = document.getElementById('prontuarioCarimboPreview');
+    if (preview) {
+        preview.src = "";
+        preview.classList.add('d-none');
+    }
+
+    const botaoAbaHistorico = document.getElementById('tab-historico-prontuarios');
+    if (botaoAbaHistorico) {
+        const instanciaTab = bootstrap.Tab.getOrCreateInstance(botaoAbaHistorico);
+        instanciaTab.show();
+    }
+
+    renderizarTabelaProntuarios();
+}
+
+function abrirEdicaoProntuario(id) {
+    const todos = buscarTodosDoBanco();
+    const prontuario = todos.find(p => p.id === id);
+
+    if (!prontuario) return alert("Prontuário não localizado.");
+
+    // 1. Identificação
+    document.getElementById('editProntuarioId').value = prontuario.id;
+    document.getElementById('editProntuarioNome').value = prontuario.nomePaciente;
+    document.getElementById('editProntuarioNasc').value = formatarDataBR(prontuario.dataNascimento);
+    document.getElementById('editProntuarioGenero').value = prontuario.genero || 'Não informado';
+    document.getElementById('editProntuarioCartao').value = prontuario.convenioCartao;
+
+    // 2. Anamnese
+    document.getElementById('editProntuarioQP').value = prontuario.qp || '';
+    document.getElementById('editProntuarioHDA').value = prontuario.hda || '';
+    document.getElementById('editProntuarioHMP').value = prontuario.hmp || '';
+    document.getElementById('editProntuarioAlergias').value = prontuario.alergias || '';
+
+    // 3. Sinais Vitais e Exame
+    document.getElementById('editProntuarioPA').value = prontuario.sinalPA || '';
+    document.getElementById('editProntuarioFC').value = prontuario.sinalFC || '';
+    document.getElementById('editProntuarioFR').value = prontuario.sinalFR || '';
+    document.getElementById('editProntuarioTEMP').value = prontuario.sinalTEMP || '';
+    document.getElementById('editProntuarioSATO2').value = prontuario.sinalSATO2 || '';
+    document.getElementById('editProntuarioEstadoGeral').value = prontuario.estadoGeral || '';
+    document.getElementById('editProntuarioCardio').value = prontuario.cardioResp || '';
+    document.getElementById('editProntuarioNeuro').value = prontuario.neuroOutros || '';
+
+    // 4. Diagnóstico, Conduta e Emissor
+    document.getElementById('editProntuarioHD').value = prontuario.hipotese || '';
+    document.getElementById('editProntuarioConduta').value = prontuario.conduta || '';
+    document.getElementById('editProntuarioPrioridade').value = prontuario.prioridade;
+    document.getElementById('editProntuarioRegistro').value = prontuario.registroProfissional || 'Não informado';
+
+    // 5. Carimbo
+    const imgCarimbo = document.getElementById('editProntuarioCarimboView');
+    const wrapper = document.getElementById('wrapperCarimboVisualizar');
+    if (prontuario.carimboAssinatura) {
+        imgCarimbo.src = prontuario.carimboAssinatura;
+        wrapper.classList.remove('d-none');
     } else {
-        salvarNoBancoERenderizar(imgSrc);
+        imgCarimbo.src = "";
+        wrapper.classList.add('d-none');
+    }
+
+    const modalElement = document.getElementById('modalEditarProntuario');
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+function salvarEdicaoProntuario() {
+    const id = parseInt(document.getElementById('editProntuarioId').value);
+    const todos = buscarTodosDoBanco();
+    const idx = todos.findIndex(p => p.id === id);
+
+    if (idx !== -1) {
+        todos[idx].prioridade = document.getElementById('editProntuarioPrioridade').value;
+        todos[idx].conduta = document.getElementById('editProntuarioConduta').value;
+
+        salvarNoBancoUnificado(todos[idx], todos);
+        renderizarTabelaProntuarios();
+        bootstrap.Modal.getInstance(document.getElementById('modalEditarProntuario')).hide();
+        alert("Evolução clínica atualizada com sucesso!");
     }
 }
 
-function abrirEdicao(botaoClicado) {
-    linhaSendoEditada = botaoClicado.closest('tr');
-    
-    document.getElementById('editTitulo').value = linhaSendoEditada.getAttribute('data-titulo') || '';
-    document.getElementById('editPreco').value = linhaSendoEditada.getAttribute('data-preco') || '';
-    document.getElementById('editRelevancia').value = linhaSendoEditada.getAttribute('data-relevancia') || 'Normal';
-    document.getElementById('editStatus').value = linhaSendoEditada.getAttribute('data-status') || 'Ativo';
-    document.getElementById('editLocalizacao').value = linhaSendoEditada.getAttribute('data-localizacao') || '';
-    document.getElementById('editDescricao').value = linhaSendoEditada.getAttribute('data-descricao') || '';
-    
-    const tipo = linhaSendoEditada.getAttribute('data-tipo') || 'maquina';
-    document.getElementById('editTipo').value = tipo === 'maquina' ? 'Máquina / Equipamento' : 'Prestação de Serviço (Operador)';
-    document.getElementById('editCategoria').value = linhaSendoEditada.getAttribute('data-categoria') || '';
-
-    const img = linhaSendoEditada.getAttribute('data-img');
-    if (document.getElementById('editPreviewFoto')) {
-        document.getElementById('editPreviewFoto').src = img || 'https://via.placeholder.com/70x50?text=Sem+Foto';
-    }
-    
-    const modalElement = document.getElementById('modalEditarServico');
-    const instance = bootstrap.Modal.getOrCreateInstance(modalElement);
-    instance.show();
-}
-
-function salvarEdicao() {
-    if (!linhaSendoEditada) return;
-
-    const idAnuncio = parseInt(linhaSendoEditada.getAttribute('data-id'));
-    const novoTitulo = document.getElementById('editTitulo').value;
-    const novoPrecoRaw = document.getElementById('editPreco').value;
-    const novoPreco = parseFloat(novoPrecoRaw).toFixed(2);
-    const novaRelevancia = document.getElementById('editRelevancia').value;
-    const novoStatus = document.getElementById('editStatus').value;
-    const novoLocalizacao = document.getElementById('editLocalizacao').value;
-    const novoDescricao = document.getElementById('editDescricao').value;
-    const inputFotoEdit = document.getElementById('editArquivo');
-
-    const finalizarAtualizacao = (fotoParaUsar) => {
-        if (idAnuncio) {
-            const todosAnuncios = JSON.parse(localStorage.getItem('maquinaria_anuncios')) || [];
-            const idx = todosAnuncios.findIndex(a => a.id === idAnuncio);
-            if (idx !== -1) {
-                todosAnuncios[idx].titulo = novoTitulo;
-                todosAnuncios[idx].preco = novoPreco;
-                todosAnuncios[idx].relevancia = novaRelevancia;
-                todosAnuncios[idx].status = novoStatus;
-                todosAnuncios[idx].local = novoLocalizacao;
-                todosAnuncios[idx].descricao = novoDescricao;
-                todosAnuncios[idx].imagem = fotoParaUsar;
-                localStorage.setItem('maquinaria_anuncios', JSON.stringify(todosAnuncios));
-            }
-        }
-
-        renderizarTabelaServicos();
-
-        const modalElement = document.getElementById('modalEditarServico');
-        const instance = bootstrap.Modal.getInstance(modalElement);
-        if (instance) {
-            instance.hide();
-        }
-
-        alert("Anúncio atualizado com sucesso!");
-        linhaSendoEditada = null;
-    };
-
-    if (inputFotoEdit && inputFotoEdit.files && inputFotoEdit.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) { finalizarAtualizacao(e.target.result); }
-        reader.readAsDataURL(inputFotoEdit.files[0]);
-    } else {
-        finalizarAtualizacao(linhaSendoEditada.getAttribute('data-img'));
-    }
-}
-
-function previewFotoEdicao(input) {
-    if (input.files && input.files[0]) {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-            document.getElementById('editPreviewFoto').src = e.target.result;
-        }
-        reader.readAsDataURL(input.files[0]);
-    }
-}
-
-// ==========================================
-// INICIALIZAÇÃO SEGURA (Prevenindo quebra de script)
-// ==========================================
 document.addEventListener('DOMContentLoaded', () => {
-    try {
-        carregarDadosPerfil();
-    } catch(e) { console.warn("Erro não crítico ao carregar perfil:", e); }
-    
-    try {
-        atualizarCategorias('catNovo', 'maquina');
-    } catch(e) { console.warn("Erro não crítico ao atualizar categorias:", e); }
-    
-    try {
-        renderizarTabelaServicos(); 
-    } catch(e) { console.error("Erro ao renderizar tabela de serviços:", e); }
+    try { carregarDadosPerfil(); } catch(e){}
+    try { renderizarTabelaProntuarios(); } catch(e){}
 
-    // ====== NOVO: SINALIZA PARA A TABELA ATUALIZAR ENQUANTO DIGITA ======
-    const inputBusca = document.getElementById('buscaTitulo');
-    if (inputBusca) {
-        inputBusca.addEventListener('input', renderizarTabelaServicos);
-    }
-    // ====================================================================
+    const inputBusca = document.getElementById('buscaPaciente');
+    if (inputBusca) inputBusca.addEventListener('input', renderizarTabelaProntuarios);
 
-    const botaoAbaServicos = document.getElementById('tab-meus-servicos');
-    if (botaoAbaServicos) {
-        botaoAbaServicos.addEventListener('shown.bs.tab', renderizarTabelaServicos);
-    }
+    const botaoAbaHistorico = document.getElementById('tab-historico-prontuarios');
+    if (botaoAbaHistorico) botaoAbaHistorico.addEventListener('shown.bs.tab', renderizarTabelaProntuarios);
 });
