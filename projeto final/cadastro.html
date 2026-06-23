@@ -18,8 +18,16 @@
             <label for="email">E-mail</label>
             <input type="email" id="email" placeholder="Digite o e-mail" required>
 
+            <label for="senha">Senha</label>
+            <input type="password" id="senha" placeholder="Digite a senha" minlength="6" autocomplete="new-password" required>
+            <div id="senhaErro" class="error-message">A senha deve ter pelo menos 6 caracteres.</div>
+
+            <label for="confirmar_senha">Confirmar Senha</label>
+            <input type="password" id="confirmar_senha" placeholder="Confirme a senha" autocomplete="new-password" required>
+            <div id="confirmarErro" class="error-message">As senhas não conferem.</div>
+
             <label for="cargo">Cargo</label>
-            <input type="text" id="cargo" placeholder="Digite o cargo" required>
+            <input type="text" id="cargo" placeholder="Digite o cargo" maxlength="30" title="Máximo 30 caracteres" required>
 
             <label for="crm_corem">CRM/COREM</label>
             <input type="text" id="crm_corem" placeholder="Digite o CRM ou COREM">
