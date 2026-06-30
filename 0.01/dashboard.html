@@ -17,7 +17,7 @@
             overflow-y: auto;
             resize: none;
         }
-        /* Estilização para a tabela de sinais vitais */
+        /* Estilização para a tabela de Sinais Vitais */
         .tabela-sinais-vitais th {
             background-color: #f8f9fa;
             color: #495057;
@@ -31,7 +31,7 @@
             text-align: center;
             font-weight: bold;
         }
-        /* Scrollbar ativa automaticamente quando passar de 5 prontuários */
+        /* Rolagem vertical para o histórico e tabelas longas */
         .historico-scroll {
             max-height: 440px;
             overflow-y: auto;
@@ -71,6 +71,12 @@
                             <button class="nav-link text-start mb-2" id="tab-novo-prontuario" data-bs-toggle="pill" data-bs-target="#aba-novo-prontuario" type="button" role="tab">
                                 <i class="bi bi-file-earmark-medical me-2"></i> Novo Prontuário
                             </button>
+                            <button class="nav-link text-start mb-2" id="tab-cadastrar-paciente" data-bs-toggle="pill" data-bs-target="#aba-cadastrar-paciente" type="button" role="tab">
+                                <i class="bi bi-person-plus me-2"></i> Cadastrar Paciente
+                            </button>
+                            <button class="nav-link text-start mb-2" id="tab-pacientes-cadastrados" data-bs-toggle="pill" data-bs-target="#aba-pacientes-cadastrados" type="button" role="tab">
+                                <i class="bi bi-people me-2"></i> Pacientes Cadastrados
+                            </button>
                             <button class="nav-link text-start" id="tab-editar-perfil" data-bs-toggle="pill" data-bs-target="#aba-perfil" type="button" role="tab">
                                 <i class="bi bi-person-gear me-2"></i> Editar Perfil
                             </button>
@@ -93,7 +99,7 @@
                                             <span class="input-group-text bg-white border-end-0 text-muted">
                                                 <i class="bi bi-search"></i>
                                             </span>
-                                            <input type="text" id="buscaPaciente" class="form-control border-start-0 ps-0" placeholder="Buscar paciente pelo nome...">
+                                            <input type="text" id="buscaPaciente" class="form-control border-start-0 ps-0" placeholder="Buscar prontuário pelo nome do paciente...">
                                         </div>
                                     </div>
                                 </div>
@@ -109,7 +115,7 @@
                                             </tr>
                                         </thead>
                                         <tbody id="tabelaProntuarios">
-                                            </tbody>
+                                        </tbody>
                                     </table>
                                 </div>
                             </div>
@@ -124,65 +130,14 @@
                                 <form id="formNovoProntuario" onsubmit="publicarProntuario(event)">
                                     
                                     <div class="bg-light p-3 rounded mb-4 border-start border-primary border-3">
-                                        <h5 class="fw-bold mb-3 text-dark">1. IDENTIFICAÇÃO DO PACIENTE</h5>
+                                        <h5 class="fw-bold mb-3 text-dark">1. IDENTIFICAÇÃO DO PACIENTE E ATENDIMENTO</h5>
                                         
                                         <div class="row g-3">
                                             <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Nome Completo:</label>
-                                                <input type="text" id="prontuarioNome" class="form-control" required 
-                                                       pattern="[A-Za-zÀ-ÿ\s]+" title="O nome deve conter apenas letras."
-                                                       oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label fw-semibold">Data Nasc.:</label>
-                                                <input type="date" id="prontuarioDataNasc" class="form-control" required>
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label d-block fw-semibold">Gênero:</label>
-                                                <div class="pt-2">
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="prontuarioGenero" id="generoM" value="Masculino" checked>
-                                                        <label class="form-check-label" for="generoM">M</label>
-                                                    </div>
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="prontuarioGenero" id="generoF" value="Feminino">
-                                                        <label class="form-check-label" for="generoF">F</label>
-                                                    </div>
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="prontuarioGenero" id="generoO" value="Outro">
-                                                        <label class="form-check-label" for="generoO">Outro</label>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-2">
-                                                <label class="form-label fw-semibold">Idade (Anos):</label>
-                                                <input type="text" id="prontuarioIdadeAnos" class="form-control text-center" maxlength="3"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label fw-semibold">Meses:</label>
-                                                <input type="text" id="prontuarioIdadeMeses" class="form-control text-center" maxlength="2"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label fw-semibold">Dias:</label>
-                                                <input type="text" id="prontuarioIdadeDias" class="form-control text-center" maxlength="2"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label fw-semibold">RG / CPF:</label>
-                                                <input type="text" id="prontuarioDocumento" class="form-control" placeholder="Apenas números"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label fw-semibold">Nº Cartão Convenio/SUS:</label>
-                                                <input type="text" id="prontuarioCartao" class="form-control" required
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                                <label class="form-label fw-semibold">Paciente:</label>
+                                                <select id="prontuarioPacienteSelect" class="form-select border-primary" required>
+                                                    <option value="">Selecione um paciente cadastrado...</option>
+                                                    </select>
                                             </div>
 
                                             <div class="col-md-6">
@@ -192,14 +147,14 @@
                                                        oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
                                             </div>
 
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
                                                 <label class="form-label fw-semibold">Especialidade:</label>
                                                 <input type="text" id="prontuarioEspecialidade" class="form-control" required placeholder="Ex: Clínica Geral"
                                                        pattern="[A-Za-zÀ-ÿ\s]+" title="A especialidade deve conter apenas letras."
                                                        oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
                                             </div>
 
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
                                                 <label class="form-label fw-semibold">Tipo Atendimento:</label>
                                                 <select id="prontuarioTipoAtendimento" class="form-select">
                                                     <option value="Consulta">Consulta</option>
@@ -208,7 +163,7 @@
                                                 </select>
                                             </div>
 
-                                            <div class="col-md-3">
+                                            <div class="col-md-4">
                                                 <label class="form-label fw-semibold">Prioridade:</label>
                                                 <select id="prontuarioPrioridade" class="form-select">
                                                     <option value="Eletivo">Eletivo</option>
@@ -227,7 +182,7 @@
                                                 <textarea id="prontuarioQP" class="form-control prontuario-textarea" maxlength="10000" placeholder="Relato do motivo da consulta..."></textarea>
                                             </div>
                                             <div class="col-12">
-                                                <label class="form-label fw-semibold">História da Doença Atual (HDA):</label>
+                                                <label class="form-label fw-semibold">Historia da Doença Atual (HDA):</label>
                                                 <textarea id="prontuarioHDA" class="form-control prontuario-textarea" maxlength="10000" placeholder="Detalhamento cronológico dos sintomas..."></textarea>
                                             </div>
                                             <div class="col-md-6">
@@ -320,6 +275,118 @@
                                         </button>
                                     </div>
                                 </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="aba-cadastrar-paciente" role="tabpanel">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-body p-4">
+                                <h4 class="card-title mb-4 fw-bold text-primary"><i class="bi bi-person-plus-fill"></i> Cadastrar Novo Paciente</h4>
+                                
+                                <form id="formNovoPaciente" onsubmit="cadastrarPaciente(event)">
+                                    <div class="bg-light p-3 rounded mb-4 border-start border-primary border-3">
+                                        <div class="row g-3">
+                                            <div class="col-md-6">
+                                                <label class="form-label fw-semibold">Nome Completo:</label>
+                                                <input type="text" id="pacienteNome" class="form-control" required 
+                                                       pattern="[A-Za-zÀ-ÿ\s]+" title="O nome deve conter apenas letras."
+                                                       oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
+                                            </div>
+
+                                            <div class="col-md-3">
+                                                <label class="form-label fw-semibold">Data Nasc.:</label>
+                                                <input type="date" id="pacienteDataNasc" class="form-control" required>
+                                            </div>
+
+                                            <div class="col-md-3">
+                                                <label class="form-label d-block fw-semibold">Gênero:</label>
+                                                <div class="pt-2">
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="pacienteGenero" id="pGeneroM" value="Masculino" checked>
+                                                        <label class="form-check-label" for="pGeneroM">M</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="pacienteGenero" id="pGeneroF" value="Feminino">
+                                                        <label class="form-check-label" for="pGeneroF">F</label>
+                                                    </div>
+                                                    <div class="form-check form-check-inline">
+                                                        <input class="form-check-input" type="radio" name="pacienteGenero" id="pGeneroO" value="Outro">
+                                                        <label class="form-check-label" for="pGeneroO">Outro</label>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            <div class="col-md-2">
+                                                <label class="form-label fw-semibold">Idade (Anos):</label>
+                                                <input type="text" id="pacienteIdadeAnos" class="form-control text-center" maxlength="3"
+                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label fw-semibold">Meses:</label>
+                                                <input type="text" id="pacienteIdadeMeses" class="form-control text-center" maxlength="2"
+                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                            </div>
+                                            <div class="col-md-2">
+                                                <label class="form-label fw-semibold">Dias:</label>
+                                                <input type="text" id="pacienteIdadeDias" class="form-control text-center" maxlength="2"
+                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                            </div>
+
+                                            <div class="col-md-3">
+                                                <label class="form-label fw-semibold">RG / CPF:</label>
+                                                <input type="text" id="pacienteDocumento" class="form-control" placeholder="Apenas números"
+                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                            </div>
+
+                                            <div class="col-md-3">
+                                                <label class="form-label fw-semibold">Nº Cartão Convenio/SUS:</label>
+                                                <input type="text" id="pacienteCartao" class="form-control" required
+                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="text-end">
+                                        <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm">
+                                            <i class="bi bi-person-check-fill"></i> Concluir Cadastro
+                                        </button>
+                                    </div>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="aba-pacientes-cadastrados" role="tabpanel">
+                        <div class="card shadow-sm border-0">
+                            <div class="card-body p-4">
+                                <h4 class="card-title mb-4 fw-bold text-dark">Pacientes Cadastrados no Sistema</h4>
+                                
+                                <div class="row mb-3">
+                                    <div class="col-md-6">
+                                        <div class="input-group">
+                                            <span class="input-group-text bg-white border-end-0 text-muted">
+                                                <i class="bi bi-search"></i>
+                                            </span>
+                                            <input type="text" id="buscaPacienteLista" class="form-control border-start-0 ps-0" placeholder="Buscar paciente pelo nome...">
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div class="table-responsive historico-scroll">
+                                    <table class="table align-middle table-hover m-0">
+                                        <thead class="sticky-top bg-white" style="z-index: 1;">
+                                            <tr>
+                                                <th>Nome Completo</th>
+                                                <th>Nascimento / Gênero</th>
+                                                <th>RG / CPF</th>
+                                                <th>Nº Cartão Convênio/SUS</th>
+                                                <th class="text-end">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tabelaPacientes">
+                                            </tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -419,6 +486,63 @@
                 <div class="modal-footer bg-light">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
                     <button type="button" class="btn btn-primary shadow-sm" onclick="salvarEdicaoProntuario()"><i class="bi bi-save"></i> Salvar Evolução</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditarPaciente" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-light">
+                    <h5 class="modal-title fw-bold text-primary"><i class="bi bi-person-gear"></i> Editar Dados Cadastrais do Paciente</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <input type="hidden" id="editPacienteId">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Nome Completo</label>
+                            <input type="text" id="editPacienteNome" class="form-control" required
+                                   pattern="[A-Za-zÀ-ÿ\s]+" oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Data Nasc.</label>
+                            <input type="date" id="editPacienteDataNasc" class="form-control" required>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Gênero</label>
+                            <select id="editPacienteGenero" class="form-select">
+                                <option value="Masculino">Masculino</option>
+                                <option value="Feminino">Feminino</option>
+                                <option value="Outro">Outro</option>
+                            </select>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Idade (Anos)</label>
+                            <input type="text" id="editPacienteIdadeAnos" class="form-control text-center" maxlength="3" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Meses</label>
+                            <input type="text" id="editPacienteIdadeMeses" class="form-control text-center" maxlength="2" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Dias</label>
+                            <input type="text" id="editPacienteIdadeDias" class="form-control text-center" maxlength="2" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">RG / CPF</label>
+                            <input type="text" id="editPacienteDocumento" class="form-control" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Nº Cartão Convenio/SUS</label>
+                            <input type="text" id="editPacienteCartao" class="form-control" required oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer bg-light">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
+                    <button type="button" class="btn btn-primary shadow-sm" onclick="salvarEdicaoPaciente()"><i class="bi bi-save"></i> Salvar Alterações</button>
                 </div>
             </div>
         </div>

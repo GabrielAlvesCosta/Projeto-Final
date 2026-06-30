@@ -1,16 +1,16 @@
+(function() {
+    // Verifica se existe o token de login no navegador
+    const usuarioLogado = localStorage.getItem('loggedInUserCPF');
+    
+    if (!usuarioLogado) {
+        // Se NÃO estiver logado, redireciona IMEDIATAMENTE para a tela de login
+        // Usamos .replace() para que o usuário não consiga voltar usando a seta "Voltar" do navegador
+        window.location.replace('login.html');
+    }
+})();
 
-        (function() {
-            // Verifica se existe o token de login no navegador
-            const usuarioLogado = localStorage.getItem('loggedInUserCPF');
-            
-            if (!usuarioLogado) {
-                // Se NÃO estiver logado, redireciona IMEDIATAMENTE para a tela de login
-                // Usamos .replace() para que o usuário não consiga voltar usando a seta "Voltar" do navegador
-                window.location.replace('login.html');
-            }
-        })();
 // ====================================================================
-// dashboard.js - GESTÃO DE PRONTUÁRIOS ELETRÔNICOS (PEP)
+// dashboard.js - GESTÃO DE PRONTUÁRIOS ELETRÔNICOS (PEP) E PACIENTES
 // ====================================================================
 
 function previewCarimbo(input) {
@@ -69,8 +69,10 @@ function salvarPerfil() {
 
     localStorage.setItem(cpfLogado, JSON.stringify(user));
     carregarDadosPerfil();
-    alert("Dados atualizados com sucesso!");
+    alert("Dados updated com sucesso!");
 }
+
+// --- MÉTODOS DE HISTÓRICO CLINICO (BANCO) ---
 
 function buscarTodosDoBanco() {
     if (typeof DB !== 'undefined') {
@@ -95,6 +97,155 @@ function salvarNoBancoUnificado(novoProntuario, listaCompleta) {
     }
 }
 
+// --- MÉTODOS DE PACIENTES (BANCO LOCAL) ---
+
+function buscarPacientesDoBanco() {
+    const locais = localStorage.getItem('bancoPacientes');
+    return locais ? JSON.parse(locais) : [];
+}
+
+function salvarPacientesNoBanco(listaCompleta) {
+    localStorage.setItem('bancoPacientes', JSON.stringify(listaCompleta));
+}
+
+// --- GERENCIAMENTO DE CADASTRO DE PACIENTES ---
+
+function cadastrarPaciente(event) {
+    event.preventDefault();
+    
+    const todos = buscarPacientesDoBanco();
+    const proximoId = todos.length > 0 ? Math.max(...todos.map(p => p.id || 0)) + 1 : 1;
+
+    const radioGenero = document.querySelector('input[name="pacienteGenero"]:checked');
+    const generoSelecionado = radioGenero ? radioGenero.value : "Não informado";
+
+    const novoPaciente = {
+        id: proximoId,
+        nome: document.getElementById('pacienteNome').value,
+        dataNasc: document.getElementById('pacienteDataNasc').value,
+        genero: generoSelecionado,
+        idadeAnos: document.getElementById('pacienteIdadeAnos').value,
+        idadeMeses: document.getElementById('pacienteIdadeMeses').value,
+        idadeDias: document.getElementById('pacienteIdadeDias').value,
+        documento: document.getElementById('pacienteDocumento').value,
+        cartao: document.getElementById('pacienteCartao').value
+    };
+
+    todos.push(novoPaciente);
+    salvarPacientesNoBanco(todos);
+
+    alert("Paciente cadastrado com sucesso!");
+    document.getElementById('formNovoPaciente').reset();
+
+    atualizarDropdownPacientes();
+    renderizarTabelaPacientes();
+
+    // Redireciona para a aba de Pacientes Cadastrados
+    const botaoAbaPacientes = document.getElementById('tab-pacientes-cadastrados');
+    if (botaoAbaPacientes) {
+        bootstrap.Tab.getOrCreateInstance(botaoAbaPacientes).show();
+    }
+}
+
+function atualizarDropdownPacientes() {
+    const select = document.getElementById('prontuarioPacienteSelect');
+    if (!select) return;
+
+    const pacientes = buscarPacientesDoBanco();
+    select.innerHTML = '<option value="">Selecione um paciente cadastrado...</option>';
+
+    pacientes.forEach(p => {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.nome} (SUS/Convênio: ${p.cartao})`;
+        select.appendChild(opt);
+    });
+}
+
+function renderizarTabelaPacientes() {
+    const tabela = document.getElementById('tabelaPacientes');
+    if (!tabela) return;
+
+    const todosOsPacientes = buscarPacientesDoBanco();
+    const inputBusca = document.getElementById('buscaPacienteLista');
+    const termoBusca = inputBusca ? inputBusca.value.toLowerCase().trim() : '';
+
+    tabela.innerHTML = '';
+
+    const filtrados = todosOsPacientes.filter(p => {
+        const nome = p.nome ? p.nome.toLowerCase() : '';
+        return nome.includes(termoBusca);
+    });
+
+    if (filtrados.length === 0) {
+        const msg = termoBusca ? 'Nenhum paciente localizado com este nome.' : 'Nenhum paciente cadastrado no sistema.';
+        tabela.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">${msg}</td></tr>`;
+        return;
+    }
+
+    filtrados.forEach(p => {
+        const linhaHTML = `
+            <tr>
+                <td><strong class="text-dark">${p.nome}</strong></td>
+                <td>${formatarDataBR(p.dataNasc)} / <span class="text-muted">${p.genero || 'N/I'}</span></td>
+                <td>${p.documento || 'Não informado'}</td>
+                <td>${p.cartao}</td>
+                <td class="text-end text-nowrap">
+                    <button class="btn btn-sm btn-outline-primary" onclick="abrirEdicaoPaciente(${p.id})">
+                        <i class="bi bi-pencil-square"></i> Editar
+                    </button>
+                </td>
+            </tr>
+        `;
+        tabela.insertAdjacentHTML('beforeend', linhaHTML);
+    });
+}
+
+function abrirEdicaoPaciente(id) {
+    const todos = buscarPacientesDoBanco();
+    const paciente = todos.find(p => p.id === id);
+    if (!paciente) return alert("Paciente não localizado.");
+
+    document.getElementById('editPacienteId').value = paciente.id;
+    document.getElementById('editPacienteNome').value = paciente.nome;
+    document.getElementById('editPacienteDataNasc').value = paciente.dataNasc;
+    document.getElementById('editPacienteGenero').value = paciente.genero || 'Masculino';
+    document.getElementById('editPacienteIdadeAnos').value = paciente.idadeAnos || '';
+    document.getElementById('editPacienteIdadeMeses').value = paciente.idadeMeses || '';
+    document.getElementById('editPacienteIdadeDias').value = paciente.idadeDias || '';
+    document.getElementById('editPacienteDocumento').value = paciente.documento || '';
+    document.getElementById('editPacienteCartao').value = paciente.cartao;
+
+    const modalElement = document.getElementById('modalEditarPaciente');
+    bootstrap.Modal.getOrCreateInstance(modalElement).show();
+}
+
+function salvarEdicaoPaciente() {
+    const id = parseInt(document.getElementById('editPacienteId').value);
+    const todos = buscarPacientesDoBanco();
+    const idx = todos.findIndex(p => p.id === id);
+
+    if (idx !== -1) {
+        todos[idx].nome = document.getElementById('editPacienteNome').value;
+        todos[idx].dataNasc = document.getElementById('editPacienteDataNasc').value;
+        todos[idx].genero = document.getElementById('editPacienteGenero').value;
+        todos[idx].idadeAnos = document.getElementById('editPacienteIdadeAnos').value;
+        todos[idx].idadeMeses = document.getElementById('editPacienteIdadeMeses').value;
+        todos[idx].idadeDias = document.getElementById('editPacienteIdadeDias').value;
+        todos[idx].documento = document.getElementById('editPacienteDocumento').value;
+        todos[idx].cartao = document.getElementById('editPacienteCartao').value;
+
+        salvarPacientesNoBanco(todos);
+        atualizarDropdownPacientes();
+        renderizarTabelaPacientes();
+
+        bootstrap.Modal.getInstance(document.getElementById('modalEditarPaciente')).hide();
+        alert("Dados cadastrais do paciente atualizados com sucesso!");
+    }
+}
+
+// --- UTILIÁRIOS DE FORMATAÇÃO ---
+
 function obterClassePrioridade(prioridade) {
     if (prioridade === 'Urgente') return 'bg-warning text-dark';
     if (prioridade === 'Emergência') return 'bg-danger text-white';
@@ -107,6 +258,8 @@ function formatarDataBR(dataString) {
     if (partes.length !== 3) return dataString;
     return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
+
+// --- GERENCIAMENTO DE PRONTUÁRIOS ---
 
 function renderizarTabelaProntuarios() {
     const tabela = document.getElementById('tabelaProntuarios');
@@ -170,26 +323,31 @@ function renderizarTabelaProntuarios() {
 function publicarProntuario(event) {
     event.preventDefault();
 
+    const pacienteId = parseInt(document.getElementById('prontuarioPacienteSelect').value);
+    if (!pacienteId) return alert("Por favor, selecione um paciente cadastrado.");
+
+    const pacientes = buscarPacientesDoBanco();
+    const pacienteSelecionado = pacientes.find(p => p.id === pacienteId);
+    if (!pacienteSelecionado) return alert("Erro ao identificar o paciente selecionado.");
+
     let cpfMedico = localStorage.getItem('loggedInUserCPF') || 'anonimo';
     const todos = buscarTodosDoBanco();
     const proximoId = todos.length > 0 ? Math.max(...todos.map(p => p.id || 0)) + 1 : 1;
-
-    const radioGenero = document.querySelector('input[name="prontuarioGenero"]:checked');
-    const generoSelecionado = radioGenero ? radioGenero.value : "Não informado";
 
     const carimboImg = document.getElementById('prontuarioCarimboPreview').src;
     const carimboSalvar = carimboImg.startsWith('data:image') ? carimboImg : '';
 
     const novoProntuario = {
         id: proximoId,
-        nomePaciente: document.getElementById('prontuarioNome').value,
-        dataNascimento: document.getElementById('prontuarioDataNasc').value,
-        genero: generoSelecionado,
-        idadeAnos: document.getElementById('prontuarioIdadeAnos').value,
-        idadeMeses: document.getElementById('prontuarioIdadeMeses').value,
-        idadeDias: document.getElementById('prontuarioIdadeDias').value,
-        documento: document.getElementById('prontuarioDocumento').value,
-        convenioCartao: document.getElementById('prontuarioCartao').value,
+        pacienteId: pacienteSelecionado.id,
+        nomePaciente: pacienteSelecionado.nome,
+        dataNascimento: pacienteSelecionado.dataNasc,
+        genero: pacienteSelecionado.genero,
+        idadeAnos: pacienteSelecionado.idadeAnos,
+        idadeMeses: pacienteSelecionado.idadeMeses,
+        idadeDias: pacienteSelecionado.idadeDias,
+        documento: pacienteSelecionado.documento,
+        convenioCartao: pacienteSelecionado.cartao,
         acompanhante: document.getElementById('prontuarioAcompanhante').value,
         especialidade: document.getElementById('prontuarioEspecialidade').value,
         tipoAtendimento: document.getElementById('prontuarioTipoAtendimento').value,
@@ -300,13 +458,28 @@ function salvarEdicaoProntuario() {
     }
 }
 
+// --- INICIALIZAÇÃO DO ECOSSISTEMA ---
+
 document.addEventListener('DOMContentLoaded', () => {
     try { carregarDadosPerfil(); } catch(e){}
     try { renderizarTabelaProntuarios(); } catch(e){}
+    try { atualizarDropdownPacientes(); } catch(e){}
+    try { renderizarTabelaPacientes(); } catch(e){}
 
+    // Listeners de Busca Dinâmica
     const inputBusca = document.getElementById('buscaPaciente');
     if (inputBusca) inputBusca.addEventListener('input', renderizarTabelaProntuarios);
 
+    const inputBuscaPacientes = document.getElementById('buscaPacienteLista');
+    if (inputBuscaPacientes) inputBuscaPacientes.addEventListener('input', renderizarTabelaPacientes);
+
+    // Atualização sob demanda das tabelas e seletores ao alternar abas do Bootstrap
     const botaoAbaHistorico = document.getElementById('tab-historico-prontuarios');
     if (botaoAbaHistorico) botaoAbaHistorico.addEventListener('shown.bs.tab', renderizarTabelaProntuarios);
+
+    const botaoAbaPacientes = document.getElementById('tab-pacientes-cadastrados');
+    if (botaoAbaPacientes) botaoAbaPacientes.addEventListener('shown.bs.tab', renderizarTabelaPacientes);
+
+    const botaoAbaNovoProntuario = document.getElementById('tab-novo-prontuario');
+    if (botaoAbaNovoProntuario) botaoAbaNovoProntuario.addEventListener('shown.bs.tab', atualizarDropdownPacientes);
 });
