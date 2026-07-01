@@ -3,515 +3,500 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Painel Clínico - Sistema PEP</title>
+    <title>Painel Clínico - Sistema PEP & Gestão Integrada</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.2/font/bootstrap-icons.min.css" rel="stylesheet">
     <style>
-        body {
-            background-color: #f4f7f6;
-        }
-        /* Estilização para as caixas de texto com rolagem automática */
-        .prontuario-textarea {
-            max-height: 140px;
-            height: 140px;
-            overflow-y: auto;
-            resize: none;
-        }
-        /* Estilização para a tabela de Sinais Vitais */
-        .tabela-sinais-vitais th {
-            background-color: #f8f9fa;
-            color: #495057;
-            font-size: 0.85rem;
-            text-align: center;
-        }
-        .tabela-sinais-vitais td {
-            padding: 8px;
-        }
-        .input-sinal-vital {
-            text-align: center;
-            font-weight: bold;
-        }
-        /* Rolagem vertical para o histórico e tabelas longas */
-        .historico-scroll {
-            max-height: 440px;
+        body { background-color: #f8f9fa; font-family: system-ui, -apple-system, sans-serif; }
+        .nav-tabs .nav-link { color: #495057; font-weight: 500; }
+        .nav-tabs .nav-link.active { font-weight: bold; }
+        .object-fit-cover { object-fit: cover; }
+
+        /* === REGRA PARA LIMITAR A 10 LINHAS COM SCROLLBAR (Tabelas Normais) === */
+        .table-scroll-container {
+            max-height: 560px;
             overflow-y: auto;
             border: 1px solid #dee2e6;
-            border-radius: 0.375rem;
+            border-radius: 4px;
         }
+        .table-scroll-container thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa !important;
+            z-index: 2;
+            box-shadow: inset 0 -1px 0 #dee2e6;
+        }
+        .table-scroll-container::-webkit-scrollbar { width: 6px; }
+        .table-scroll-container::-webkit-scrollbar-track { background: #f1f1f1; }
+        .table-scroll-container::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
+        .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
+
+        /* === NOVA REGRA PARA LIMITAR A 4 LINHAS (Aba Meu Perfil) === */
+        .table-scroll-short {
+            max-height: 260px; /* Altura exata para cabeçalho + 4 linhas */
+            overflow-y: auto;
+            border: 1px solid #dee2e6;
+            border-radius: 4px;
+        }
+        .table-scroll-short thead th {
+            position: sticky;
+            top: 0;
+            background-color: #f8f9fa !important;
+            z-index: 2;
+            box-shadow: inset 0 -1px 0 #dee2e6;
+        }
+        .table-scroll-short::-webkit-scrollbar { width: 6px; }
+        .table-scroll-short::-webkit-scrollbar-track { background: #f1f1f1; }
+        .table-scroll-short::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
+        .table-scroll-short::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
     </style>
 </head>
 <body>
 
-    <nav class="navbar navbar-expand-lg navbar-dark bg-primary shadow-sm mb-4">
-        <div class="container">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark shadow-sm">
+        <div class="container-fluid px-4">
             <a class="navbar-brand d-flex align-items-center gap-2" href="#">
-                <i class="bi bi-heart-pulse-fill"></i> ClinicalPEP
+                <i class="bi bi-heart-pulse-fill text-danger"></i>
+                <span>CliniSys PEP</span>
             </a>
-            
             <div class="d-flex align-items-center gap-3">
-                <span id="user-display-name" class="text-white fw-bold d-none d-sm-block">Profissional</span>
-                
-                <button onclick="if(typeof DB !== 'undefined') { DB.logout(); } else { localStorage.removeItem('loggedInUserCPF'); window.location.href = 'login.html'; }" class="btn btn-danger btn-sm d-flex align-items-center gap-1 shadow-sm border border-light">
+                <span id="user-display-name" class="text-white small fw-medium">Profissional</span>
+                <button class="btn btn-sm btn-outline-light" onclick="localStorage.removeItem('loggedInUserCPF'); window.location.replace('login.html');">
                     <i class="bi bi-box-arrow-right"></i> Sair
                 </button>
             </div>
         </div>
     </nav>
 
-    <div class="container mb-5">
+    <div class="container-fluid my-4 px-4">
         <div class="row">
-            
-            <div class="col-md-3 mb-4">
-                <div class="card shadow-sm border-0">
-                    <div class="card-body p-3">
-                        <div class="nav flex-column nav-pills" id="v-pills-tab" role="tablist" aria-orientation="vertical">
-                            <button class="nav-link active text-start mb-2" id="tab-historico-prontuarios" data-bs-toggle="pill" data-bs-target="#aba-historico" type="button" role="tab">
-                                <i class="bi bi-folder-symlink me-2"></i> Histórico de Prontuários
-                            </button>
-                            <button class="nav-link text-start mb-2" id="tab-novo-prontuario" data-bs-toggle="pill" data-bs-target="#aba-novo-prontuario" type="button" role="tab">
-                                <i class="bi bi-file-earmark-medical me-2"></i> Novo Prontuário
-                            </button>
-                            <button class="nav-link text-start mb-2" id="tab-cadastrar-paciente" data-bs-toggle="pill" data-bs-target="#aba-cadastrar-paciente" type="button" role="tab">
-                                <i class="bi bi-person-plus me-2"></i> Cadastrar Paciente
-                            </button>
-                            <button class="nav-link text-start mb-2" id="tab-pacientes-cadastrados" data-bs-toggle="pill" data-bs-target="#aba-pacientes-cadastrados" type="button" role="tab">
-                                <i class="bi bi-people me-2"></i> Pacientes Cadastrados
-                            </button>
-                            <button class="nav-link text-start" id="tab-editar-perfil" data-bs-toggle="pill" data-bs-target="#aba-perfil" type="button" role="tab">
-                                <i class="bi bi-person-gear me-2"></i> Editar Perfil
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
+            <div class="col-12">
+                
+                <ul class="nav nav-tabs mb-4" id="dashboardTabs" role="tablist">
+                    <li class="nav-item">
+                        <button class="nav-link active" id="tab-perfil-aba" data-bs-toggle="tab" data-bs-target="#pane-perfil" type="button" role="tab">
+                            <i class="bi bi-person-vcard"></i> Meu Perfil
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="tab-novo-paciente" data-bs-toggle="tab" data-bs-target="#pane-novo-paciente" type="button" role="tab">
+                            <i class="bi bi-person-plus"></i> Cadastrar Paciente
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="tab-pacientes-cadastrados" data-bs-toggle="tab" data-bs-target="#pane-pacientes-lista" type="button" role="tab">
+                            <i class="bi bi-people"></i> Pacientes Cadastrados
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="tab-nova-consulta" data-bs-toggle="tab" data-bs-target="#pane-nova-consulta" type="button" role="tab">
+                            <i class="bi bi-calendar-plus"></i> Agendar Consulta
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="tab-consultas-agendadas" data-bs-toggle="tab" data-bs-target="#pane-consultas-lista" type="button" role="tab">
+                            <i class="bi bi-calendar-check"></i> Consultas Agendadas
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="tab-consultas-concluidas" data-bs-toggle="tab" data-bs-target="#pane-consultas-concluidas" type="button" role="tab">
+                            <i class="bi bi-archive"></i> Consultas Concluídas
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="tab-novo-prontuario" data-bs-toggle="tab" data-bs-target="#pane-novo-prontuario" type="button" role="tab">
+                            <i class="bi bi-file-earmark-medical"></i> Novo Prontuário (PEP)
+                        </button>
+                    </li>
+                    <li class="nav-item">
+                        <button class="nav-link" id="tab-historico-prontuarios" data-bs-toggle="tab" data-bs-target="#pane-historico-prontuarios" type="button" role="tab">
+                            <i class="bi bi-folder2-open"></i> Histórico de Prontuários
+                        </button>
+                    </li>
+                </ul>
 
-            <div class="col-md-9">
-                <div class="tab-content" id="v-pills-tabContent">
+                <div class="tab-content bg-white p-4 rounded shadow-sm" id="dashboardTabsContent">
                     
-                    <div class="tab-pane fade show active" id="aba-historico" role="tabpanel">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body p-4">
-                                <h4 class="card-title mb-4 fw-bold text-dark">Prontuários Registrados no Sistema</h4>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-white border-end-0 text-muted">
-                                                <i class="bi bi-search"></i>
-                                            </span>
-                                            <input type="text" id="buscaPaciente" class="form-control border-start-0 ps-0" placeholder="Buscar prontuário pelo nome do paciente...">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="table-responsive historico-scroll">
-                                    <table class="table align-middle table-hover m-0">
-                                        <thead class="sticky-top bg-white" style="z-index: 1;">
-                                            <tr>
-                                                <th>Paciente / Convênio</th>
-                                                <th>Especialidade / Complexidade</th>
-                                                <th>Nascimento e Gênero</th>
-                                                <th class="text-end">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="tabelaProntuarios">
-                                        </tbody>
-                                    </table>
-                                </div>
+                    <div class="tab-pane fade show active" id="pane-perfil" role="tabpanel">
+                        <h4 class="mb-3 text-primary"><i class="bi bi-person-gear"></i> Perfil do Profissional</h4>
+                        <div class="row g-4">
+                            <div class="col-md-3 text-center border-end">
+                                <img id="perfilFoto" src="https://cdn-icons-png.flaticon.com/512/3135/3135715.png" class="rounded-circle object-fit-cover img-thumbnail mb-3" style="width: 150px; height: 150px;">
+                                <input type="file" id="uploadFoto" class="form-control form-control-sm" accept="image/*" onchange="previewFoto(this)">
                             </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="aba-novo-prontuario" role="tabpanel">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body p-4">
-                                <h4 class="card-title mb-4 fw-bold text-primary"><i class="bi bi-file-medical-fill"></i> Abertura de Novo Prontuário Ambulatorial</h4>
-                                
-                                <form id="formNovoProntuario" onsubmit="publicarProntuario(event)">
-                                    
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-primary border-3">
-                                        <h5 class="fw-bold mb-3 text-dark">1. IDENTIFICAÇÃO DO PACIENTE E ATENDIMENTO</h5>
-                                        
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Paciente:</label>
-                                                <select id="prontuarioPacienteSelect" class="form-select border-primary" required>
-                                                    <option value="">Selecione um paciente cadastrado...</option>
-                                                    </select>
-                                            </div>
-
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Acompanhante (se houver):</label>
-                                                <input type="text" id="prontuarioAcompanhante" class="form-control"
-                                                       pattern="[A-Za-zÀ-ÿ\s]+" title="O nome do acompanhante deve conter apenas letras."
-                                                       oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-4">
-                                                <label class="form-label fw-semibold">Especialidade:</label>
-                                                <input type="text" id="prontuarioEspecialidade" class="form-control" required placeholder="Ex: Clínica Geral"
-                                                       pattern="[A-Za-zÀ-ÿ\s]+" title="A especialidade deve conter apenas letras."
-                                                       oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-4">
-                                                <label class="form-label fw-semibold">Tipo Atendimento:</label>
-                                                <select id="prontuarioTipoAtendimento" class="form-select">
-                                                    <option value="Consulta">Consulta</option>
-                                                    <option value="Retorno">Retorno</option>
-                                                    <option value="Urgência">Urgência</option>
-                                                </select>
-                                            </div>
-
-                                            <div class="col-md-4">
-                                                <label class="form-label fw-semibold">Prioridade:</label>
-                                                <select id="prontuarioPrioridade" class="form-select">
-                                                    <option value="Eletivo">Eletivo</option>
-                                                    <option value="Urgente">Urgente</option>
-                                                    <option value="Emergência">Emergência</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-success border-3">
-                                        <h5 class="fw-bold mb-3 text-dark">2. ANAMNESE (HISTÓRICO CLÍNICO)</h5>
-                                        <div class="row g-3">
-                                            <div class="col-12">
-                                                <label class="form-label fw-semibold">Queixa Principal (QP):</label>
-                                                <textarea id="prontuarioQP" class="form-control prontuario-textarea" maxlength="10000" placeholder="Relato do motivo da consulta..."></textarea>
-                                            </div>
-                                            <div class="col-12">
-                                                <label class="form-label fw-semibold">Historia da Doença Atual (HDA):</label>
-                                                <textarea id="prontuarioHDA" class="form-control prontuario-textarea" maxlength="10000" placeholder="Detalhamento cronológico dos sintomas..."></textarea>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Histórico Médico / Comorbidades:</label>
-                                                <textarea id="prontuarioHMP" class="form-control prontuario-textarea" maxlength="10000" placeholder="Hipertensão, Diabetes, etc..."></textarea>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Histórico Medicamentoso / Alergias:</label>
-                                                <textarea id="prontuarioAlergias" class="form-control prontuario-textarea" maxlength="10000" placeholder="Medicamentos em uso ou alergias..."></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-warning border-3">
-                                        <h5 class="fw-bold mb-3 text-dark">3. EXAME FÍSICO E SINAIS VITAIS</h5>
-                                        <div class="table-responsive mb-3">
-                                            <table class="table table-bordered align-middle m-0 shadow-sm bg-white tabela-sinais-vitais">
-                                                <thead>
-                                                    <tr>
-                                                        <th>PA (PRESSÃO ARTERIAL)<br><small class="text-muted">mmHg</small></th>
-                                                        <th>FC (FREQ. CARDÍACA)<br><small class="text-muted">bpm</small></th>
-                                                        <th>FR (FREQ. RESPIRATÓRIA)<br><small class="text-muted">irpm</small></th>
-                                                        <th>TEMPERATURA<br><small class="text-muted">°C</small></th>
-                                                        <th>SATO<sub>2</sub><br><small class="text-muted">%</small></th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    <tr>
-                                                        <td><input type="text" id="prontuarioPA" class="form-control border-0 input-sinal-vital" placeholder="___/___" oninput="this.value = this.value.replace(/[^0-9/]/g, '')" required></td>
-                                                        <td><input type="text" id="prontuarioFC" class="form-control border-0 input-sinal-vital" placeholder="____" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required></td>
-                                                        <td><input type="text" id="prontuarioFR" class="form-control border-0 input-sinal-vital" placeholder="____" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required></td>
-                                                        <td><input type="text" id="prontuarioTEMP" class="form-control border-0 input-sinal-vital" placeholder="____" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" required></td>
-                                                        <td><input type="text" id="prontuarioSATO2" class="form-control border-0 input-sinal-vital" placeholder="____" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required></td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                        <div class="row g-3">
-                                            <div class="col-12">
-                                                <label class="form-label fw-semibold">Estado Geral do Paciente:</label>
-                                                <textarea id="prontuarioEstadoGeral" class="form-control prontuario-textarea" maxlength="10000" placeholder="Ex: LOTE, eupneico, bom estado geral..."></textarea>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Exame Cardiovascular / Respiratório:</label>
-                                                <textarea id="prontuarioCardioResp" class="form-control prontuario-textarea" maxlength="10000" placeholder="Ausculta cardíaca e pulmonar..."></textarea>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Exame Neurológico / Outros Sistemas:</label>
-                                                <textarea id="prontuarioNeuroOutros" class="form-control prontuario-textarea" maxlength="10000" placeholder="Reflexos, abdômen, extremidades..."></textarea>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-danger border-3">
-                                        <h5 class="fw-bold mb-3 text-dark">4. HIPÓTESE DIAGNÓSTICA (HD)</h5>
-                                        <textarea id="prontuarioHipotese" class="form-control prontuario-textarea" maxlength="10000" placeholder="Definição das hipóteses ou códigos CID..."></textarea>
-                                    </div>
-
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-secondary border-3">
-                                        <h5 class="fw-bold mb-3 text-dark">5. CONDUTA E PLANO TERAPÊUTICO</h5>
-                                        <textarea id="prontuarioConduta" class="form-control prontuario-textarea" maxlength="10000" placeholder="Prescrições, orientações de retorno e exames..."></textarea>
-                                    </div>
-
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-info border-3">
-                                        <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-patch-check-fill text-info"></i> Autenticação do Prontuário</h5>
-                                        <div class="row g-3 align-items-center">
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Carregar Imagem do Carimbo + Assinatura Virtual:</label>
-                                                <input type="file" id="prontuarioCarimboInput" class="form-control" accept="image/*" onchange="previewCarimbo(this)">
-                                            </div>
-                                            <div class="col-md-6 text-center">
-                                                <img id="prontuarioCarimboPreview" src="" class="img-thumbnail d-none" style="max-height: 110px; object-fit: contain;" alt="Carimbo Técnico">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-dark border-3">
-                                        <h5 class="fw-bold mb-3 text-dark"><i class="bi bi-person-badge-fill"></i> Registro Regulamentar</h5>
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">CRM / COREN do Profissional Responsável:</label>
-                                                <input type="text" id="prontuarioRegistroProfissional" class="form-control" required placeholder="Ex: CRM/SP 123456 ou COREN/RJ 98765">
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div class="text-end">
-                                        <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm">
-                                            <i class="bi bi-file-earmark-plus"></i> Salvar e Emitir Prontuário
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="aba-cadastrar-paciente" role="tabpanel">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body p-4">
-                                <h4 class="card-title mb-4 fw-bold text-primary"><i class="bi bi-person-plus-fill"></i> Cadastrar Novo Paciente</h4>
-                                
-                                <form id="formNovoPaciente" onsubmit="cadastrarPaciente(event)">
-                                    <div class="bg-light p-3 rounded mb-4 border-start border-primary border-3">
-                                        <div class="row g-3">
-                                            <div class="col-md-6">
-                                                <label class="form-label fw-semibold">Nome Completo:</label>
-                                                <input type="text" id="pacienteNome" class="form-control" required 
-                                                       pattern="[A-Za-zÀ-ÿ\s]+" title="O nome deve conter apenas letras."
-                                                       oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label fw-semibold">Data Nasc.:</label>
-                                                <input type="date" id="pacienteDataNasc" class="form-control" required>
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label d-block fw-semibold">Gênero:</label>
-                                                <div class="pt-2">
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="pacienteGenero" id="pGeneroM" value="Masculino" checked>
-                                                        <label class="form-check-label" for="pGeneroM">M</label>
-                                                    </div>
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="pacienteGenero" id="pGeneroF" value="Feminino">
-                                                        <label class="form-check-label" for="pGeneroF">F</label>
-                                                    </div>
-                                                    <div class="form-check form-check-inline">
-                                                        <input class="form-check-input" type="radio" name="pacienteGenero" id="pGeneroO" value="Outro">
-                                                        <label class="form-check-label" for="pGeneroO">Outro</label>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div class="col-md-2">
-                                                <label class="form-label fw-semibold">Idade (Anos):</label>
-                                                <input type="text" id="pacienteIdadeAnos" class="form-control text-center" maxlength="3"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label fw-semibold">Meses:</label>
-                                                <input type="text" id="pacienteIdadeMeses" class="form-control text-center" maxlength="2"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-                                            <div class="col-md-2">
-                                                <label class="form-label fw-semibold">Dias:</label>
-                                                <input type="text" id="pacienteIdadeDias" class="form-control text-center" maxlength="2"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label fw-semibold">RG / CPF:</label>
-                                                <input type="text" id="pacienteDocumento" class="form-control" placeholder="Apenas números"
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-
-                                            <div class="col-md-3">
-                                                <label class="form-label fw-semibold">Nº Cartão Convenio/SUS:</label>
-                                                <input type="text" id="pacienteCartao" class="form-control" required
-                                                       oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="text-end">
-                                        <button type="submit" class="btn btn-primary btn-lg px-5 shadow-sm">
-                                            <i class="bi bi-person-check-fill"></i> Concluir Cadastro
-                                        </button>
-                                    </div>
-                                </form>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="aba-pacientes-cadastrados" role="tabpanel">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body p-4">
-                                <h4 class="card-title mb-4 fw-bold text-dark">Pacientes Cadastrados no Sistema</h4>
-                                
-                                <div class="row mb-3">
-                                    <div class="col-md-6">
-                                        <div class="input-group">
-                                            <span class="input-group-text bg-white border-end-0 text-muted">
-                                                <i class="bi bi-search"></i>
-                                            </span>
-                                            <input type="text" id="buscaPacienteLista" class="form-control border-start-0 ps-0" placeholder="Buscar paciente pelo nome...">
-                                        </div>
-                                    </div>
-                                </div>
-
-                                <div class="table-responsive historico-scroll">
-                                    <table class="table align-middle table-hover m-0">
-                                        <thead class="sticky-top bg-white" style="z-index: 1;">
-                                            <tr>
-                                                <th>Nome Completo</th>
-                                                <th>Nascimento / Gênero</th>
-                                                <th>RG / CPF</th>
-                                                <th>Nº Cartão Convênio/SUS</th>
-                                                <th class="text-end">Ações</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody id="tabelaPacientes">
-                                            </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="tab-pane fade" id="aba-perfil" role="tabpanel">
-                        <div class="card shadow-sm border-0">
-                            <div class="card-body p-4">
-                                <h4 class="card-title mb-4 fw-bold text-dark">Perfil do Profissional de Saúde</h4>
-                                <div class="row align-items-center mb-4">
-                                    <div class="col-auto">
-                                        <img id="perfilFoto" src="https://cdn-icons-png.flaticon.com/512/3774/3774299.png" class="rounded-circle img-thumbnail shadow-sm" style="width: 120px; height: 120px; object-fit: cover;" alt="Foto do perfil">
-                                    </div>
-                                    <div class="col">
-                                        <label class="form-label fw-bold">Alterar Foto de Perfil</label>
-                                        <input type="file" class="form-control" id="inputFotoPerfil" accept="image/*" onchange="previewFoto(this)">
-                                    </div>
-                                </div>
+                            <div class="col-md-9">
                                 <div class="row g-3">
-                                    <div class="col-md-6"><label class="form-label">Nome Completo:</label><input type="text" id="perfilNome" class="form-control"></div>
-                                    <div class="col-md-6"><label class="form-label">E-mail Profissional:</label><input type="email" id="perfilEmail" class="form-control"></div>
-                                    <div class="col-md-6"><label class="form-label">CPF cadastrado:</label><input type="text" id="perfilCPF" class="form-control" disabled></div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">Nome Completo</label>
+                                        <input type="text" id="perfilNome" class="form-control">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">E-mail Profissional</label>
+                                        <input type="email" id="perfilEmail" class="form-control">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label fw-bold">CPF (Identificador)</label>
+                                        <input type="text" id="perfilCPF" class="form-control" disabled>
+                                    </div>
+                                    <div class="col-12 mt-4">
+                                        <button class="btn btn-primary" onclick="salvarPerfil()"><i class="bi bi-save"></i> Salvar Alterações</button>
+                                    </div>
                                 </div>
-                                <div class="text-end mt-4"><button onclick="salvarPerfil()" class="btn btn-success px-4">Salvar Alterações</button></div>
+                            </div>
+                        </div>
+
+                        <hr class="my-5 text-muted">
+                        <h4 class="mb-4 text-primary"><i class="bi bi-journal-medical"></i> Meu Painel de Atendimentos</h4>
+
+                        <div class="row g-4">
+                            <div class="col-lg-6">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="text-primary mb-0"><i class="bi bi-calendar2-check"></i> Consultas Agendadas</h5>
+                                </div>
+                                <div class="table-responsive table-scroll-short">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Paciente</th>
+                                                <th>Data / Hora</th>
+                                                <th>Status</th>
+                                                <th class="text-end">Ações de Triagem</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tabelaMinhasConsultas"></tbody>
+                                    </table>
+                                </div>
+                            </div>
+
+                            <div class="col-lg-6">
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <h5 class="text-secondary mb-0"><i class="bi bi-archive"></i> Histórico (Concluídas/Canceladas)</h5>
+                                </div>
+                                <div class="table-responsive table-scroll-short">
+                                    <table class="table table-hover align-middle mb-0">
+                                        <thead class="table-light">
+                                            <tr>
+                                                <th>Paciente</th>
+                                                <th>Data / Hora</th>
+                                                <th>Status Final</th>
+                                                <th class="text-end">Ações</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="tabelaMinhasConsultasConcluidas"></tbody>
+                                    </table>
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                </div>
-            </div>
-
-        </div>
-    </div>
-
-    <div class="modal fade" id="modalEditarProntuario" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-xl">
-            <div class="modal-content">
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold text-primary"><i class="bi bi-file-earmark-medical"></i> Prontuário Clínico Completo</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                </div>
-                <div class="modal-body">
-                    <div class="row g-3">
-                        <input type="hidden" id="editProntuarioId">
-                        
-                        <h6 class="fw-bold text-secondary border-bottom pb-1 mt-0">Identificação do Paciente</h6>
-                        <div class="col-md-4"><label class="form-label fw-semibold small mb-1">Nome Completo</label><input type="text" id="editProntuarioNome" class="form-control form-control-sm bg-light" disabled></div>
-                        <div class="col-md-2"><label class="form-label fw-semibold small mb-1">Data Nasc.</label><input type="text" id="editProntuarioNasc" class="form-control form-control-sm bg-light" disabled></div>
-                        <div class="col-md-2"><label class="form-label fw-semibold small mb-1">Gênero</label><input type="text" id="editProntuarioGenero" class="form-control form-control-sm bg-light" disabled></div>
-                        <div class="col-md-4"><label class="form-label fw-semibold small mb-1">Convênio/SUS</label><input type="text" id="editProntuarioCartao" class="form-control form-control-sm bg-light" disabled></div>
-
-                        <h6 class="fw-bold text-secondary border-bottom pb-1 mt-4">Histórico Clínico (Anamnese)</h6>
-                        <div class="col-12"><label class="form-label fw-semibold small mb-1">Queixa Principal (QP)</label><textarea id="editProntuarioQP" class="form-control form-control-sm bg-light" disabled rows="2"></textarea></div>
-                        <div class="col-12"><label class="form-label fw-semibold small mb-1">História da Doença Atual (HDA)</label><textarea id="editProntuarioHDA" class="form-control form-control-sm bg-light" disabled rows="3"></textarea></div>
-                        <div class="col-md-6"><label class="form-label fw-semibold small mb-1">Comorbidades (HMP)</label><textarea id="editProntuarioHMP" class="form-control form-control-sm bg-light" disabled rows="2"></textarea></div>
-                        <div class="col-md-6"><label class="form-label fw-semibold small mb-1">Alergias / Medicações</label><textarea id="editProntuarioAlergias" class="form-control form-control-sm bg-light" disabled rows="2"></textarea></div>
-
-                        <h6 class="fw-bold text-secondary border-bottom pb-1 mt-4">Exame Físico e Sinais Vitais</h6>
-                        <div class="col-12">
-                            <div class="d-flex gap-2 text-center">
-                                <div class="flex-fill"><label class="form-label fw-bold small mb-1 text-danger">PA (mmHg)</label><input type="text" id="editProntuarioPA" class="form-control form-control-sm text-center bg-light fw-bold" disabled></div>
-                                <div class="flex-fill"><label class="form-label fw-bold small mb-1 text-danger">FC (bpm)</label><input type="text" id="editProntuarioFC" class="form-control form-control-sm text-center bg-light fw-bold" disabled></div>
-                                <div class="flex-fill"><label class="form-label fw-bold small mb-1 text-danger">FR (irpm)</label><input type="text" id="editProntuarioFR" class="form-control form-control-sm text-center bg-light fw-bold" disabled></div>
-                                <div class="flex-fill"><label class="form-label fw-bold small mb-1 text-danger">TEMP (°C)</label><input type="text" id="editProntuarioTEMP" class="form-control form-control-sm text-center bg-light fw-bold" disabled></div>
-                                <div class="flex-fill"><label class="form-label fw-bold small mb-1 text-danger">SATO2 (%)</label><input type="text" id="editProntuarioSATO2" class="form-control form-control-sm text-center bg-light fw-bold" disabled></div>
+                    <div class="tab-pane fade" id="pane-novo-paciente" role="tabpanel">
+                        <h4 class="mb-3 text-primary"><i class="bi bi-person-fill-add"></i> Cadastrar Novo Paciente</h4>
+                        <form id="formNovoPaciente" onsubmit="cadastrarPaciente(event)">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Nome do Paciente</label>
+                                    <input type="text" id="pacienteNome" class="form-control" oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold">Data de Nascimento</label>
+                                    <input type="date" id="pacienteDataNasc" class="form-control" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold d-block">Gênero</label>
+                                    <div class="mt-2">
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="pacienteGenero" id="genM" value="Masculino" checked>
+                                            <label class="form-check-label" for="genM">M</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="pacienteGenero" id="genF" value="Feminino">
+                                            <label class="form-check-label" for="genF">F</label>
+                                        </div>
+                                        <div class="form-check form-check-inline">
+                                            <input class="form-check-input" type="radio" name="pacienteGenero" id="genO" value="Outro">
+                                            <label class="form-check-label" for="genO">Outro</label>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Idade (Anos / Meses / Dias)</label>
+                                    <div class="input-group">
+                                        <input type="number" id="pacienteIdadeAnos" class="form-control" placeholder="Anos">
+                                        <input type="number" id="pacienteIdadeMeses" class="form-control" placeholder="Meses">
+                                        <input type="number" id="pacienteIdadeDias" class="form-control" placeholder="Dias">
+                                    </div>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Documento (CPF/RG)</label>
+                                    <input type="text" id="pacienteDocumento" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Apenas números">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Cartão SUS / Convênio</label>
+                                    <input type="text" id="pacienteCartao" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Apenas números" required>
+                                </div>
+                                <div class="col-12 mt-4">
+                                    <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Cadastrar Paciente</button>
+                                </div>
                             </div>
-                        </div>
-                        <div class="col-12"><label class="form-label fw-semibold small mb-1 mt-2">Estado Geral</label><textarea id="editProntuarioEstadoGeral" class="form-control form-control-sm bg-light" disabled rows="2"></textarea></div>
-                        <div class="col-md-6"><label class="form-label fw-semibold small mb-1">Cardiovascular / Respiratório</label><textarea id="editProntuarioCardio" class="form-control form-control-sm bg-light" disabled rows="2"></textarea></div>
-                        <div class="col-md-6"><label class="form-label fw-semibold small mb-1">Neurológico / Outros</label><textarea id="editProntuarioNeuro" class="form-control form-control-sm bg-light" disabled rows="2"></textarea></div>
+                        </form>
+                    </div>
 
-                        <h6 class="fw-bold text-secondary border-bottom pb-1 mt-4">Diagnóstico e Planejamento Terapêutico</h6>
-                        <div class="col-12"><label class="form-label fw-semibold small mb-1">Hipótese Diagnóstica (HD)</label><textarea id="editProntuarioHD" class="form-control form-control-sm bg-light" disabled rows="2"></textarea></div>
-                        
-                        <div class="col-md-6">
-                            <label class="form-label fw-bold text-primary small mb-1">Complexidade / Prioridade (Editável)</label>
-                            <select id="editProntuarioPrioridade" class="form-select border-primary">
-                                <option value="Eletivo">Eletivo</option>
-                                <option value="Urgente">Urgente</option>
-                                <option value="Emergência">Emergência</option>
-                            </select>
+                    <div class="tab-pane fade" id="pane-pacientes-lista" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="text-primary mb-0"><i class="bi bi-people-fill"></i> Pacientes Cadastrados</h4>
+                            <div class="w-25"><input type="text" id="buscaPacienteLista" class="form-control" placeholder="Buscar por nome..."></div>
                         </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold small mb-1">Registro do Emissor</label>
-                            <input type="text" id="editProntuarioRegistro" class="form-control bg-light" disabled>
-                        </div>
-                        <div class="col-12">
-                            <label class="form-label fw-bold text-primary mb-1 mt-2">Conduta Médica / Evolução Clínica (Editável)</label>
-                            <textarea id="editProntuarioConduta" class="form-control border-primary" rows="4"></textarea>
-                        </div>
-                        
-                        <div class="col-12 text-center mt-3 pt-3 border-top" id="wrapperCarimboVisualizar">
-                            <p class="text-muted small mb-2 fw-bold">Autenticação Documental Registrada:</p>
-                            <img id="editProntuarioCarimboView" src="" style="max-height: 120px; object-fit: contain; border: 1px dashed #ccc; padding: 5px; border-radius: 5px;" alt="Assinatura e Carimbo">
+                        <div class="table-responsive table-scroll-container">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Nome</th>
+                                        <th>Nascimento / Gênero</th>
+                                        <th>Documento</th>
+                                        <th>Cartão SUS/Convênio</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabelaPacientes"></tbody>
+                            </table>
                         </div>
                     </div>
-                </div>
-                <div class="modal-footer bg-light">
-                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="button" class="btn btn-primary shadow-sm" onclick="salvarEdicaoProntuario()"><i class="bi bi-save"></i> Salvar Evolução</button>
+
+                    <div class="tab-pane fade" id="pane-nova-consulta" role="tabpanel">
+                        <h4 class="mb-3 text-primary"><i class="bi bi-calendar-plus-fill"></i> Agendar Nova Consulta</h4>
+                        <form id="formNovaConsulta" onsubmit="agendarConsulta(event)">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Paciente</label>
+                                    <select id="consultaPacienteSelect" class="form-select" required>
+                                        <option value="">Selecione um paciente cadastrado...</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold">Data</label>
+                                    <input type="date" id="consultaData" class="form-control" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label fw-bold">Horário</label>
+                                    <input type="time" id="consultaHorario" class="form-control" required>
+                                </div>
+                                <div class="col-md-12">
+                                    <label class="form-label fw-bold">Médico / Especialista Responsável</label>
+                                    <select id="consultaProfissional" class="form-select" required>
+                                        <option value="">Selecione um profissional cadastrado...</option>
+                                    </select>
+                                </div>
+                                <div class="col-12 mt-4">
+                                    <button type="submit" class="btn btn-primary"><i class="bi bi-bookmark-plus"></i> Agendar Horário</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="pane-consultas-lista" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="text-primary mb-0"><i class="bi bi-calendar-week"></i> Mural de Consultas Ativas (Todas)</h4>
+                            <div class="w-25"><input type="text" id="buscaConsulta" class="form-control" placeholder="Buscar paciente ou médico..."></div>
+                        </div>
+                        <div class="table-responsive table-scroll-container">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Paciente</th>
+                                        <th>Data / Hora</th>
+                                        <th>Profissional</th>
+                                        <th>Status</th>
+                                        <th class="text-end">Ações de Triagem/Fluxo</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabelaConsultas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="pane-consultas-concluidas" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="text-primary mb-0"><i class="bi bi-archive-fill"></i> Histórico de Consultas Concluídas / Canceladas (Todas)</h4>
+                            <div class="w-25"><input type="text" id="buscaConsultaConcluida" class="form-control" placeholder="Buscar paciente ou médico..."></div>
+                        </div>
+                        <div class="table-responsive table-scroll-container">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Paciente</th>
+                                        <th>Data / Hora</th>
+                                        <th>Profissional</th>
+                                        <th>Status Final</th>
+                                        <th class="text-end">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabelaConsultasConcluidas"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
+                    <div class="tab-pane fade" id="pane-novo-prontuario" role="tabpanel">
+                        <h4 class="mb-3 text-primary"><i class="bi bi-file-earmark-medical-fill"></i> Abertura de Prontuário de Atendimento</h4>
+                        <form id="formNovoProntuario" onsubmit="publicarProntuario(event)">
+                            <div class="row g-3">
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Selecione o Paciente</label>
+                                    <select id="prontuarioPacienteSelect" class="form-select" required></select>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Acompanhante (Se houver)</label>
+                                    <input type="text" id="prontuarioAcompanhante" class="form-control">
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Especialidade do Atendimento</label>
+                                    <input type="text" id="prontuarioEspecialidade" class="form-control" placeholder="Ex: Clínica Geral" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Tipo de Atendimento</label>
+                                    <select id="prontuarioTipoAtendimento" class="form-select">
+                                        <option value="Consulta Eletiva">Consulta Eletiva</option>
+                                        <option value="Urgência/Emergência">Urgência/Emergência</option>
+                                        <option value="Retorno">Retorno</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label fw-bold">Classificação de Risco (Prioridade)</label>
+                                    <select id="prontuarioPrioridade" class="form-select">
+                                        <option value="Normal">Normal (Verde)</option>
+                                        <option value="Urgente">Urgente (Amarelo)</option>
+                                        <option value="Emergência">Emergência (Vermelho)</option>
+                                    </select>
+                                </div>
+
+                                <div class="col-12"><hr><h5 class="text-secondary">Sinais Vitais (Triagem)</h5></div>
+
+                                <div class="col-md-2">
+                                    <label class="form-label small fw-bold">P.A. (mmHg)</label>
+                                    <input type="text" id="prontuarioPA" class="form-control" oninput="this.value = this.value.replace(/[^0-9/]/g, '')" placeholder="120/80">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small fw-bold">F.C. (bpm)</label>
+                                    <input type="text" id="prontuarioFC" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small fw-bold">F.R. (rpm)</label>
+                                    <input type="text" id="prontuarioFR" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-bold">Temp. Corporal (°C)</label>
+                                    <input type="text" id="prontuarioTEMP" class="form-control" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" placeholder="Ex: 36.5">
+                                </div>
+                                <div class="col-md-3">
+                                    <label class="form-label small fw-bold">SatO₂ (%)</label>
+                                    <input type="text" id="prontuarioSATO2" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                </div>
+
+                                <div class="col-12"><hr><h5 class="text-secondary">Anamnese e Exame Clínico</h5></div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Queixa Principal (QP)</label>
+                                    <textarea id="prontuarioQP" class="form-control" rows="2" required></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">História da Doença Atual (HDA)</label>
+                                    <textarea id="prontuarioHDA" class="form-control" rows="2" required></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Histórico Médico Pregresso (HMP)</label>
+                                    <textarea id="prontuarioHMP" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Alergias Conhecidas</label>
+                                    <textarea id="prontuarioAlergias" class="form-control" rows="2" placeholder="Nega alergias ou listar..."></textarea>
+                                </div>
+
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Estado Geral</label>
+                                    <textarea id="prontuarioEstadoGeral" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Exame Cardiorrespiratório</label>
+                                    <textarea id="prontuarioCardioResp" class="form-control" rows="2"></textarea>
+                                </div>
+                                <div class="col-md-4">
+                                    <label class="form-label small fw-bold">Exame Neurológico / Outros</label>
+                                    <textarea id="prontuarioNeuroOutros" class="form-control" rows="2"></textarea>
+                                </div>
+
+                                <div class="col-12"><hr></div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-danger">Hipótese Diagnóstica (HD)</label>
+                                    <textarea id="prontuarioHipotese" class="form-control" rows="3" required></textarea>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold text-success">Conduta / Prescrição Clínica</label>
+                                    <textarea id="prontuarioConduta" class="form-control" rows="3" required></textarea>
+                                </div>
+
+                                <div class="col-12"><hr></div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Registro Profissional (CRM/COREN)</label>
+                                    <input type="text" id="prontuarioRegistroProfissional" class="form-control" placeholder="Ex: CRM/AL 12345" required>
+                                </div>
+                                <div class="col-md-6">
+                                    <label class="form-label fw-bold">Carimbo Digitalizado / Assinatura (Opcional)</label>
+                                    <input type="file" id="prontuarioCarimbo" class="form-control" accept="image/*" onchange="previewCarimbo(this)">
+                                    <div class="mt-2">
+                                        <img id="prontuarioCarimboPreview" src="" class="d-none img-thumbnail border shadow-sm" style="max-height: 80px;">
+                                    </div>
+                                </div>
+
+                                <div class="col-12 mt-4 border-top pt-3">
+                                    <button type="submit" class="btn btn-danger btn-lg"><i class="bi bi-shield-lock"></i> Autenticar e Assinar Prontuário</button>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="tab-pane fade" id="pane-historico-prontuarios" role="tabpanel">
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h4 class="text-primary mb-0"><i class="bi bi-archive-fill"></i> Repositório de Prontuários Eletrônicos</h4>
+                            <div class="w-25"><input type="text" id="buscaPaciente" class="form-control" placeholder="Filtrar por nome do paciente..."></div>
+                        </div>
+                        <div class="table-responsive table-scroll-container">
+                            <table class="table table-hover align-middle mb-0">
+                                <thead class="table-light">
+                                    <tr>
+                                        <th>Paciente / Atendimento</th>
+                                        <th>Especialidade / Risco</th>
+                                        <th>Dados Cadastrais</th>
+                                        <th class="text-end">Registro Físico</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tabelaProntuarios"></tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
     </div>
 
     <div class="modal fade" id="modalEditarPaciente" tabindex="-1" aria-hidden="true">
-        <div class="modal-dialog modal-lg">
+        <div class="modal-dialog modal-lg modal-dialog-centered">
             <div class="modal-content">
-                <div class="modal-header bg-light">
-                    <h5 class="modal-title fw-bold text-primary"><i class="bi bi-person-gear"></i> Editar Dados Cadastrais do Paciente</h5>
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title"><i class="bi bi-pencil-square"></i> Editar Dados Cadastrais do Paciente</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
                 </div>
                 <div class="modal-body">
+                    <input type="hidden" id="editPacienteId">
                     <div class="row g-3">
-                        <input type="hidden" id="editPacienteId">
                         <div class="col-md-6">
-                            <label class="form-label fw-semibold">Nome Completo</label>
-                            <input type="text" id="editPacienteNome" class="form-control" required
-                                   pattern="[A-Za-zÀ-ÿ\s]+" oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')">
+                            <label class="form-label fw-bold">Nome</label>
+                            <input type="text" id="editPacienteNome" class="form-control">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Data Nasc.</label>
-                            <input type="date" id="editPacienteDataNasc" class="form-control" required>
+                            <label class="form-label fw-bold">Nascimento</label>
+                            <input type="date" id="editPacienteDataNasc" class="form-control">
                         </div>
                         <div class="col-md-3">
-                            <label class="form-label fw-semibold">Gênero</label>
+                            <label class="form-label fw-bold">Gênero</label>
                             <select id="editPacienteGenero" class="form-select">
                                 <option value="Masculino">Masculino</option>
                                 <option value="Feminino">Feminino</option>
@@ -519,37 +504,121 @@
                             </select>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Idade (Anos)</label>
-                            <input type="text" id="editPacienteIdadeAnos" class="form-control text-center" maxlength="3" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                            <label class="form-label fw-bold">Idade (A / M / D)</label>
+                            <div class="input-group">
+                                <input type="number" id="editPacienteIdadeAnos" class="form-control" placeholder="Anos">
+                                <input type="number" id="editPacienteIdadeMeses" class="form-control" placeholder="Meses">
+                                <input type="number" id="editPacienteIdadeDias" class="form-control" placeholder="Dias">
+                            </div>
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Meses</label>
-                            <input type="text" id="editPacienteIdadeMeses" class="form-control text-center" maxlength="2" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                            <label class="form-label fw-bold">Documento</label>
+                            <input type="text" id="editPacienteDocumento" class="form-control">
                         </div>
                         <div class="col-md-4">
-                            <label class="form-label fw-semibold">Dias</label>
-                            <input type="text" id="editPacienteIdadeDias" class="form-control text-center" maxlength="2" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">RG / CPF</label>
-                            <input type="text" id="editPacienteDocumento" class="form-control" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
-                        </div>
-                        <div class="col-md-6">
-                            <label class="form-label fw-semibold">Nº Cartão Convenio/SUS</label>
-                            <input type="text" id="editPacienteCartao" class="form-control" required oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                            <label class="form-label fw-bold">Cartão SUS/Convênio</label>
+                            <input type="text" id="editPacienteCartao" class="form-control">
                         </div>
                     </div>
                 </div>
-                <div class="modal-footer bg-light">
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                    <button type="button" class="btn btn-success" onclick="salvarEdicaoPaciente()">Salvar Alterações</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="modal fade" id="modalEditarProntuario" tabindex="-1" aria-hidden="true">
+        <div class="modal-dialog modal-xl modal-dialog-centered modal-dialog-scrollable">
+            <div class="modal-content border-danger">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title"><i class="bi bi-file-earmark-medical"></i> Registro de Prontuário Clínico Consolidado</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body bg-light">
+                    <input type="hidden" id="editProntuarioId">
+                    
+                    <div class="card mb-3 border-0 shadow-sm">
+                        <div class="card-body row g-2">
+                            <div class="col-md-4"><strong>Paciente:</strong> <span id="editProntuarioNome" class="text-dark"></span></div>
+                            <div class="col-md-3"><strong>Nascimento:</strong> <span id="editProntuarioNasc"></span></div>
+                            <div class="col-md-2"><strong>Gênero:</strong> <span id="editProntuarioGenero"></span></div>
+                            <div class="col-md-3"><strong>Nº Carteira:</strong> <span id="editProntuarioCartao"></span></div>
+                        </div>
+                    </div>
+
+                    <div class="row g-3 mb-3">
+                        <div class="col-md-4">
+                            <div class="card h-100 p-3 border-0 shadow-sm">
+                                <h6><i class="bi bi-activity text-danger"></i> Sinais Vitais Registrados</h6>
+                                <div class="small mt-2">
+                                    <strong>P.A.:</strong> <input type="text" id="editProntuarioPA" class="form-control form-control-sm my-1" disabled>
+                                    <strong>F.C.:</strong> <input type="text" id="editProntuarioFC" class="form-control form-control-sm my-1" disabled>
+                                    <strong>F.R.:</strong> <input type="text" id="editProntuarioFR" class="form-control form-control-sm my-1" disabled>
+                                    <strong>Temp:</strong> <input type="text" id="editProntuarioTEMP" class="form-control form-control-sm my-1" disabled>
+                                    <strong>SatO₂:</strong> <input type="text" id="editProntuarioSATO2" class="form-control form-control-sm my-1" disabled>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-8">
+                            <div class="card h-100 p-3 border-0 shadow-sm">
+                                <h6><i class="bi bi-heart-pulse text-primary"></i> Anamnese e Avaliação de Sistemas</h6>
+                                <div class="row g-2 small mt-1">
+                                    <div class="col-md-6"><strong>QP:</strong> <textarea id="editProntuarioQP" class="form-control form-control-sm" rows="1" disabled></textarea></div>
+                                    <div class="col-md-6"><strong>HDA:</strong> <textarea id="editProntuarioHDA" class="form-control form-control-sm" rows="1" disabled></textarea></div>
+                                    <div class="col-md-6"><strong>HMP:</strong> <textarea id="editProntuarioHMP" class="form-control form-control-sm" rows="1" disabled></textarea></div>
+                                    <div class="col-md-6"><strong>Alergias:</strong> <textarea id="editProntuarioAlergias" class="form-control form-control-sm" rows="1" disabled></textarea></div>
+                                    <div class="col-md-4"><strong>Geral:</strong> <textarea id="editProntuarioEstadoGeral" class="form-control form-control-sm" rows="1" disabled></textarea></div>
+                                    <div class="col-md-4"><strong>Cardio:</strong> <textarea id="editProntuarioCardio" class="form-control form-control-sm" rows="1" disabled></textarea></div>
+                                    <div class="col-md-4"><strong>Neuro:</strong> <textarea id="editProntuarioNeuro" class="form-control form-control-sm" rows="1" disabled></textarea></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card p-3 border-0 shadow-sm border-start border-3 border-warning mb-3">
+                        <h6 class="text-warning-emphasis"><i class="bi bi-layer-forward"></i> Diagnóstico & Modificação de Conduta</h6>
+                        <div class="row g-3 mt-1">
+                            <div class="col-md-4">
+                                <label class="form-label small fw-bold">Classificação de Risco Atual</label>
+                                <select id="editProntuarioPrioridade" class="form-select form-select-sm">
+                                    <option value="Normal">Normal (Verde)</option>
+                                    <option value="Urgente">Urgente (Amarelo)</option>
+                                    <option value="Emergência">Emergência (Vermelho)</option>
+                                </select>
+                            </div>
+                            <div class="col-md-8">
+                                <label class="form-label small fw-bold">Hipótese Diagnóstica (HD)</label>
+                                <textarea id="editProntuarioHD" class="form-control form-control-sm" rows="1" disabled></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label small fw-bold text-success">Conduta / Evolução Médica (Editável)</label>
+                                <textarea id="editProntuarioConduta" class="form-control" rows="3"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="d-flex align-items-center justify-content-between p-3 bg-white rounded border small mt-3">
+                        <div class="d-flex flex-column">
+                            <div><strong>Status do Registro:</strong> <span class="badge bg-success"><i class="bi bi-shield-check"></i> Prontuário Autenticado</span></div>
+                            <div class="mt-1 text-muted"><strong>Registro Profissional:</strong> <span id="editProntuarioRegistro" class="fw-bold text-dark"></span></div>
+                        </div>
+                        <div id="wrapperCarimboVisualizar" class="d-none">
+                            <img id="editProntuarioCarimboView" src="" class="img-fluid border rounded" style="max-height: 60px;" title="Assinatura Digitalizada">
+                        </div>
+                    </div>
+
+                </div>
+                <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Fechar</button>
-                    <button type="button" class="btn btn-primary shadow-sm" onclick="salvarEdicaoPaciente()"><i class="bi bi-save"></i> Salvar Alterações</button>
+                    <button type="button" class="btn btn-danger" onclick="salvarEdicaoProntuario()"><i class="bi bi-arrow-repeat"></i> Atualizar Evolução Clínica</button>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="db.js"></script>
     <script src="dashboard.js"></script>
 </body>
 </html>

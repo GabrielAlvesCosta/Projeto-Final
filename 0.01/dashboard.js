@@ -3,14 +3,12 @@
     const usuarioLogado = localStorage.getItem('loggedInUserCPF');
     
     if (!usuarioLogado) {
-        // Se NÃO estiver logado, redireciona IMEDIATAMENTE para a tela de login
-        // Usamos .replace() para que o usuário não consiga voltar usando a seta "Voltar" do navegador
         window.location.replace('login.html');
     }
 })();
 
 // ====================================================================
-// dashboard.js - GESTÃO DE PRONTUÁRIOS ELETRÔNICOS (PEP) E PACIENTES
+// dashboard.js - PEP, GESTÃO DE PACIENTES E AGENDAMENTO DE CONSULTAS
 // ====================================================================
 
 function previewCarimbo(input) {
@@ -34,6 +32,16 @@ function previewFoto(input) {
         reader.onload = function(e) { document.getElementById('perfilFoto').src = e.target.result; }
         reader.readAsDataURL(input.files[0]);
     }
+}
+
+// === CAPTURA DO NOME DO PROFISSIONAL LOGADO ===
+function obterNomeProfissionalLogado() {
+    const cpfLogado = localStorage.getItem('loggedInUserCPF');
+    if (cpfLogado) {
+        const user = JSON.parse(localStorage.getItem(cpfLogado));
+        if (user && user.nome) return user.nome;
+    }
+    return "";
 }
 
 function carregarDadosPerfil() {
@@ -69,10 +77,14 @@ function salvarPerfil() {
 
     localStorage.setItem(cpfLogado, JSON.stringify(user));
     carregarDadosPerfil();
-    alert("Dados updated com sucesso!");
+    
+    // Atualiza tudo que depende do nome atual do profissional
+    atualizarDropdowns();
+    renderizarMinhasConsultas();
+    renderizarMinhasConsultasConcluidas();
+    
+    alert("Dados atualizados com sucesso!");
 }
-
-// --- MÉTODOS DE HISTÓRICO CLINICO (BANCO) ---
 
 function buscarTodosDoBanco() {
     if (typeof DB !== 'undefined') {
@@ -92,12 +104,10 @@ function salvarNoBancoUnificado(novoProntuario, listaCompleta) {
             else if (typeof DB.salvar === 'function') DB.salvar(novoProntuario);
             else if (typeof DB.adicionar === 'function') DB.adicionar(novoProntuario);
         } catch (err) {
-            console.warn("db.js encontrou um descompasso estrutural, mas o dado local está seguro.", err);
+            console.warn("db.js encontrou descompasso estrutural, mas o dado local está seguro.", err);
         }
     }
 }
-
-// --- MÉTODOS DE PACIENTES (BANCO LOCAL) ---
 
 function buscarPacientesDoBanco() {
     const locais = localStorage.getItem('bancoPacientes');
@@ -108,7 +118,68 @@ function salvarPacientesNoBanco(listaCompleta) {
     localStorage.setItem('bancoPacientes', JSON.stringify(listaCompleta));
 }
 
-// --- GERENCIAMENTO DE CADASTRO DE PACIENTES ---
+function buscarConsultasDoBanco() {
+    const locais = localStorage.getItem('bancoConsultas');
+    return locais ? JSON.parse(locais) : [];
+}
+
+function salvarConsultasNoBanco(listaCompleta) {
+    localStorage.setItem('bancoConsultas', JSON.stringify(listaCompleta));
+}
+
+function buscarProfissionaisCadastrados() {
+    let profissionais = [];
+
+    const bancoUsuarios = JSON.parse(localStorage.getItem('bancoUsuarios') || '[]');
+    if (bancoUsuarios.length > 0) return bancoUsuarios;
+
+    for (let i = 0; i < localStorage.length; i++) {
+        let key = localStorage.key(i);
+        if (['bancoPacientes', 'bancoConsultas', 'bancoProntuarios', 'loggedInUserCPF'].includes(key)) continue;
+        
+        try {
+            let item = JSON.parse(localStorage.getItem(key));
+            if (item && typeof item === 'object' && !Array.isArray(item) && item.nome) {
+                profissionais.push({
+                    id: key,
+                    nome: item.nome
+                });
+            }
+        } catch(e) {}
+    }
+
+    if (profissionais.length === 0) {
+        const cpfLogado = localStorage.getItem('loggedInUserCPF');
+        if (cpfLogado) {
+            const userLogado = JSON.parse(localStorage.getItem(cpfLogado)) || {};
+            const nomeProf = userLogado.nome || 'Profissional Logado';
+            profissionais.push({ id: cpfLogado, nome: nomeProf });
+        }
+    }
+
+    return profissionais;
+}
+
+function atualizarDropdowns() {
+    const selectProntuario = document.getElementById('prontuarioPacienteSelect');
+    const selectConsulta = document.getElementById('consultaPacienteSelect');
+    const pacientes = buscarPacientesDoBanco();
+    
+    const optionsPacientesHTML = '<option value="">Selecione um paciente cadastrado...</option>' + 
+        pacientes.map(p => `<option value="${p.id}">${p.nome} (Doc: ${p.documento || 'S/N'})</option>`).join('');
+
+    if (selectProntuario) selectProntuario.innerHTML = optionsPacientesHTML;
+    if (selectConsulta) selectConsulta.innerHTML = optionsPacientesHTML;
+
+    const selectProfissional = document.getElementById('consultaProfissional');
+    if (selectProfissional) {
+        const profissionais = buscarProfissionaisCadastrados();
+        const optionsProfissionaisHTML = '<option value="">Selecione um profissional cadastrado...</option>' + 
+            profissionais.map(prof => `<option value="${prof.nome}">${prof.nome}</option>`).join('');
+            
+        selectProfissional.innerHTML = optionsProfissionaisHTML;
+    }
+}
 
 function cadastrarPaciente(event) {
     event.preventDefault();
@@ -137,29 +208,13 @@ function cadastrarPaciente(event) {
     alert("Paciente cadastrado com sucesso!");
     document.getElementById('formNovoPaciente').reset();
 
-    atualizarDropdownPacientes();
+    atualizarDropdowns();
     renderizarTabelaPacientes();
 
-    // Redireciona para a aba de Pacientes Cadastrados
     const botaoAbaPacientes = document.getElementById('tab-pacientes-cadastrados');
     if (botaoAbaPacientes) {
         bootstrap.Tab.getOrCreateInstance(botaoAbaPacientes).show();
     }
-}
-
-function atualizarDropdownPacientes() {
-    const select = document.getElementById('prontuarioPacienteSelect');
-    if (!select) return;
-
-    const pacientes = buscarPacientesDoBanco();
-    select.innerHTML = '<option value="">Selecione um paciente cadastrado...</option>';
-
-    pacientes.forEach(p => {
-        const opt = document.createElement('option');
-        opt.value = p.id;
-        opt.textContent = `${p.nome} (SUS/Convênio: ${p.cartao})`;
-        select.appendChild(opt);
-    });
 }
 
 function renderizarTabelaPacientes() {
@@ -173,8 +228,7 @@ function renderizarTabelaPacientes() {
     tabela.innerHTML = '';
 
     const filtrados = todosOsPacientes.filter(p => {
-        const nome = p.nome ? p.nome.toLowerCase() : '';
-        return nome.includes(termoBusca);
+        return p.nome && p.nome.toLowerCase().includes(termoBusca);
     });
 
     if (filtrados.length === 0) {
@@ -236,15 +290,285 @@ function salvarEdicaoPaciente() {
         todos[idx].cartao = document.getElementById('editPacienteCartao').value;
 
         salvarPacientesNoBanco(todos);
-        atualizarDropdownPacientes();
+        atualizarDropdowns();
         renderizarTabelaPacientes();
 
         bootstrap.Modal.getInstance(document.getElementById('modalEditarPaciente')).hide();
-        alert("Dados cadastrais do paciente atualizados com sucesso!");
+        alert("Dados cadastrais atualizados com sucesso!");
     }
 }
 
-// --- UTILIÁRIOS DE FORMATAÇÃO ---
+function agendarConsulta(event) {
+    event.preventDefault();
+
+    const pacienteId = parseInt(document.getElementById('consultaPacienteSelect').value);
+    if (!pacienteId) return alert("Por favor, selecione um paciente.");
+
+    const pacientes = buscarPacientesDoBanco();
+    const pacienteSelecionado = pacientes.find(p => p.id === pacienteId);
+    if (!pacienteSelecionado) return alert("Paciente não encontrado no sistema.");
+
+    const todas = buscarConsultasDoBanco();
+    const proximoId = todas.length > 0 ? Math.max(...todas.map(c => c.id || 0)) + 1 : 1;
+
+    const novaConsulta = {
+        id: proximoId,
+        pacienteId: pacienteSelecionado.id,
+        nomePaciente: pacienteSelecionado.nome,
+        data: document.getElementById('consultaData').value,
+        horario: document.getElementById('consultaHorario').value,
+        profissional: document.getElementById('consultaProfissional').value,
+        status: 'Agendado'
+    };
+
+    todas.push(novaConsulta);
+    salvarConsultasNoBanco(todas);
+
+    alert("Consulta agendada com sucesso!");
+    document.getElementById('formNovaConsulta').reset();
+    
+    // Atualiza todas as tabelas afetadas
+    renderizarTabelaConsultas();
+    renderizarTabelaConsultasConcluidas();
+    renderizarMinhasConsultas();
+    renderizarMinhasConsultasConcluidas();
+
+    const botaoAbaConsultas = document.getElementById('tab-consultas-agendadas');
+    if (botaoAbaConsultas) {
+        bootstrap.Tab.getOrCreateInstance(botaoAbaConsultas).show();
+    }
+}
+
+function obterClasseStatusConsulta(status) {
+    if (status === 'Confirmado') return 'bg-success text-white';
+    if (status === 'Cancelado') return 'bg-danger text-white';
+    if (status === 'Atendido') return 'bg-info text-dark';
+    return 'bg-warning text-dark';
+}
+
+// === EXIBIÇÃO: MURAL DE CONSULTAS (TODOS) ===
+function renderizarTabelaConsultas() {
+    const tabela = document.getElementById('tabelaConsultas');
+    if (!tabela) return;
+
+    let todasAsConsultas = buscarConsultasDoBanco();
+
+    todasAsConsultas.sort((a, b) => {
+        const dataHoraA = new Date(`${a.data}T${a.horario}`);
+        const dataHoraB = new Date(`${b.data}T${b.horario}`);
+        return dataHoraA - dataHoraB; 
+    });
+
+    const inputBusca = document.getElementById('buscaConsulta');
+    const termoBusca = inputBusca ? inputBusca.value.toLowerCase().trim() : '';
+
+    tabela.innerHTML = '';
+
+    const filtradas = todasAsConsultas.filter(c => {
+        if (c.status === 'Atendido' || c.status === 'Cancelado') return false;
+
+        const paciente = c.nomePaciente ? c.nomePaciente.toLowerCase() : '';
+        const medico = c.profissional ? c.profissional.toLowerCase() : '';
+        return paciente.includes(termoBusca) || medico.includes(termoBusca);
+    });
+
+    if (filtradas.length === 0) {
+        const msg = termoBusca ? 'Nenhum agendamento ativo localizado.' : 'Nenhuma consulta ativa no mural.';
+        tabela.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">${msg}</td></tr>`;
+        return;
+    }
+
+    filtradas.forEach(c => {
+        const corStatus = obterClasseStatusConsulta(c.status);
+        const linhaHTML = `
+            <tr>
+                <td><strong class="text-dark">${c.nomePaciente}</strong></td>
+                <td><i class="bi bi-calendar3 text-primary"></i> ${formatarDataBR(c.data)} às <strong>${c.horario}</strong></td>
+                <td><span class="badge bg-secondary">${c.profissional}</span></td>
+                <td><span class="badge ${corStatus}">${c.status}</span></td>
+                <td class="text-end text-nowrap">
+                    <div class="btn-group btn-group-sm">
+                        <button class="btn btn-outline-success" onclick="alterarStatusConsulta(${c.id}, 'Confirmado')" title="Confirmar Presença">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-info" onclick="alterarStatusConsulta(${c.id}, 'Atendido')" title="Finalizar e Mover para Concluídas">
+                            <i class="bi bi-person-check"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="alterarStatusConsulta(${c.id}, 'Cancelado')" title="Cancelar Horário e Mover para Concluídas">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+        tabela.insertAdjacentHTML('beforeend', linhaHTML);
+    });
+}
+
+// === EXIBIÇÃO: HISTÓRICO DE CONSULTAS (TODOS) ===
+function renderizarTabelaConsultasConcluidas() {
+    const tabela = document.getElementById('tabelaConsultasConcluidas');
+    if (!tabela) return;
+
+    let todasAsConsultas = buscarConsultasDoBanco();
+
+    todasAsConsultas.sort((a, b) => {
+        const dataHoraA = new Date(`${a.data}T${a.horario}`);
+        const dataHoraB = new Date(`${b.data}T${b.horario}`);
+        return dataHoraB - dataHoraA; 
+    });
+
+    const inputBusca = document.getElementById('buscaConsultaConcluida');
+    const termoBusca = inputBusca ? inputBusca.value.toLowerCase().trim() : '';
+
+    tabela.innerHTML = '';
+
+    const filtradas = todasAsConsultas.filter(c => {
+        if (c.status !== 'Atendido' && c.status !== 'Cancelado') return false;
+
+        const paciente = c.nomePaciente ? c.nomePaciente.toLowerCase() : '';
+        const medico = c.profissional ? c.profissional.toLowerCase() : '';
+        return paciente.includes(termoBusca) || medico.includes(termoBusca);
+    });
+
+    if (filtradas.length === 0) {
+        const msg = termoBusca ? 'Nenhum histórico localizado.' : 'Nenhuma consulta concluída ou cancelada arquivada.';
+        tabela.innerHTML = `<tr><td colspan="5" class="text-center text-muted py-4">${msg}</td></tr>`;
+        return;
+    }
+
+    filtradas.forEach(c => {
+        const corStatus = obterClasseStatusConsulta(c.status);
+        const linhaHTML = `
+            <tr>
+                <td><strong class="text-dark">${c.nomePaciente}</strong></td>
+                <td><i class="bi bi-calendar-check text-secondary"></i> ${formatarDataBR(c.data)} às <strong>${c.horario}</strong></td>
+                <td><span class="badge bg-secondary">${c.profissional}</span></td>
+                <td><span class="badge ${corStatus}">${c.status}</span></td>
+                <td class="text-end text-nowrap">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="alterarStatusConsulta(${c.id}, 'Agendado')" title="Reativar para o Mural">
+                        <i class="bi bi-arrow-counterclockwise"></i> Reativar
+                    </button>
+                </td>
+            </tr>
+        `;
+        tabela.insertAdjacentHTML('beforeend', linhaHTML);
+    });
+}
+
+// =========================================================================
+// SISTEMA EXCLUSIVO DO PERFIL "MINHAS CONSULTAS"
+// =========================================================================
+function renderizarMinhasConsultas() {
+    const tabela = document.getElementById('tabelaMinhasConsultas');
+    if (!tabela) return;
+
+    let todasAsConsultas = buscarConsultasDoBanco();
+    const meuNome = obterNomeProfissionalLogado();
+
+    let minhasAtivas = todasAsConsultas.filter(c => 
+        c.profissional === meuNome && 
+        (c.status === 'Agendado' || c.status === 'Confirmado')
+    );
+
+    minhasAtivas.sort((a, b) => {
+        const dataHoraA = new Date(`${a.data}T${a.horario}`);
+        const dataHoraB = new Date(`${b.data}T${b.horario}`);
+        return dataHoraA - dataHoraB; 
+    });
+
+    tabela.innerHTML = '';
+
+    if (minhasAtivas.length === 0) {
+        tabela.innerHTML = `<tr><td colspan=\"4\" class=\"text-center text-muted py-4\">Você não possui agendamentos pendentes.</td></tr>`;
+        return;
+    }
+
+    minhasAtivas.forEach(c => {
+        const corStatus = obterClasseStatusConsulta(c.status);
+        const linhaHTML = `
+            <tr>
+                <td><strong class="text-dark">${c.nomePaciente}</strong></td>
+                <td><i class="bi bi-calendar3 text-primary"></i> ${formatarDataBR(c.data)}<br><strong>${c.horario}</strong></td>
+                <td><span class="badge ${corStatus}">${c.status}</span></td>
+                <td class="text-end text-nowrap">
+                    <div class="btn-group btn-group-sm d-flex flex-column gap-1">
+                        <button class="btn btn-outline-success" onclick="alterarStatusConsulta(${c.id}, 'Confirmado')" title="Confirmar Presença">
+                            <i class="bi bi-check-lg"></i>
+                        </button>
+                        <button class="btn btn-outline-info" onclick="alterarStatusConsulta(${c.id}, 'Atendido')" title="Finalizar e Mover">
+                            <i class="bi bi-person-check"></i>
+                        </button>
+                        <button class="btn btn-outline-danger" onclick="alterarStatusConsulta(${c.id}, 'Cancelado')" title="Cancelar Horário">
+                            <i class="bi bi-x-lg"></i>
+                        </button>
+                    </div>
+                </td>
+            </tr>
+        `;
+        tabela.insertAdjacentHTML('beforeend', linhaHTML);
+    });
+}
+
+function renderizarMinhasConsultasConcluidas() {
+    const tabela = document.getElementById('tabelaMinhasConsultasConcluidas');
+    if (!tabela) return;
+
+    let todasAsConsultas = buscarConsultasDoBanco();
+    const meuNome = obterNomeProfissionalLogado();
+
+    let minhasConcluidas = todasAsConsultas.filter(c => 
+        c.profissional === meuNome && 
+        (c.status === 'Atendido' || c.status === 'Cancelado')
+    );
+
+    minhasConcluidas.sort((a, b) => {
+        const dataHoraA = new Date(`${a.data}T${a.horario}`);
+        const dataHoraB = new Date(`${b.data}T${b.horario}`);
+        return dataHoraB - dataHoraA; 
+    });
+
+    tabela.innerHTML = '';
+
+    if (minhasConcluidas.length === 0) {
+        tabela.innerHTML = `<tr><td colspan=\"4\" class=\"text-center text-muted py-4\">Você não possui consultas concluídas no histórico.</td></tr>`;
+        return;
+    }
+
+    minhasConcluidas.forEach(c => {
+        const corStatus = obterClasseStatusConsulta(c.status);
+        const linhaHTML = `
+            <tr>
+                <td><strong class="text-dark">${c.nomePaciente}</strong></td>
+                <td><i class="bi bi-calendar-check text-secondary"></i> ${formatarDataBR(c.data)}<br><strong>${c.horario}</strong></td>
+                <td><span class="badge ${corStatus}">${c.status}</span></td>
+                <td class="text-end text-nowrap">
+                    <button class="btn btn-sm btn-outline-secondary" onclick="alterarStatusConsulta(${c.id}, 'Agendado')" title="Reativar para o Mural">
+                        <i class="bi bi-arrow-counterclockwise"></i>
+                    </button>
+                </td>
+            </tr>
+        `;
+        tabela.insertAdjacentHTML('beforeend', linhaHTML);
+    });
+}
+
+// === CENTRAL DE STATUS ===
+function alterarStatusConsulta(id, novoStatus) {
+    const todas = buscarConsultasDoBanco();
+    const idx = todas.findIndex(c => c.id === id);
+
+    if (idx !== -1) {
+        todas[idx].status = novoStatus;
+        salvarConsultasNoBanco(todas);
+        
+        // Renderiza todas as 4 tabelas para atualizar em tempo real globalmente!
+        renderizarTabelaConsultas();
+        renderizarTabelaConsultasConcluidas();
+        renderizarMinhasConsultas();
+        renderizarMinhasConsultasConcluidas();
+    }
+}
 
 function obterClassePrioridade(prioridade) {
     if (prioridade === 'Urgente') return 'bg-warning text-dark';
@@ -258,8 +582,6 @@ function formatarDataBR(dataString) {
     if (partes.length !== 3) return dataString;
     return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
-
-// --- GERENCIAMENTO DE PRONTUÁRIOS ---
 
 function renderizarTabelaProntuarios() {
     const tabela = document.getElementById('tabelaProntuarios');
@@ -385,8 +707,7 @@ function publicarProntuario(event) {
 
     const botaoAbaHistorico = document.getElementById('tab-historico-prontuarios');
     if (botaoAbaHistorico) {
-        const instanciaTab = bootstrap.Tab.getOrCreateInstance(botaoAbaHistorico);
-        instanciaTab.show();
+        bootstrap.Tab.getOrCreateInstance(botaoAbaHistorico).show();
     }
 
     renderizarTabelaProntuarios();
@@ -398,20 +719,18 @@ function abrirEdicaoProntuario(id) {
 
     if (!prontuario) return alert("Prontuário não localizado.");
 
-    // 1. Identificação
     document.getElementById('editProntuarioId').value = prontuario.id;
-    document.getElementById('editProntuarioNome').value = prontuario.nomePaciente;
-    document.getElementById('editProntuarioNasc').value = formatarDataBR(prontuario.dataNascimento);
-    document.getElementById('editProntuarioGenero').value = prontuario.genero || 'Não informado';
-    document.getElementById('editProntuarioCartao').value = prontuario.convenioCartao;
+    
+    document.getElementById('editProntuarioNome').textContent = prontuario.nomePaciente || 'Não informado';
+    document.getElementById('editProntuarioNasc').textContent = formatarDataBR(prontuario.dataNascimento);
+    document.getElementById('editProntuarioGenero').textContent = prontuario.genero || 'Não informado';
+    document.getElementById('editProntuarioCartao').textContent = prontuario.convenioCartao || 'Não informado';
 
-    // 2. Anamnese
     document.getElementById('editProntuarioQP').value = prontuario.qp || '';
     document.getElementById('editProntuarioHDA').value = prontuario.hda || '';
     document.getElementById('editProntuarioHMP').value = prontuario.hmp || '';
     document.getElementById('editProntuarioAlergias').value = prontuario.alergias || '';
 
-    // 3. Sinais Vitais e Exame
     document.getElementById('editProntuarioPA').value = prontuario.sinalPA || '';
     document.getElementById('editProntuarioFC').value = prontuario.sinalFC || '';
     document.getElementById('editProntuarioFR').value = prontuario.sinalFR || '';
@@ -421,16 +740,15 @@ function abrirEdicaoProntuario(id) {
     document.getElementById('editProntuarioCardio').value = prontuario.cardioResp || '';
     document.getElementById('editProntuarioNeuro').value = prontuario.neuroOutros || '';
 
-    // 4. Diagnóstico, Conduta e Emissor
     document.getElementById('editProntuarioHD').value = prontuario.hipotese || '';
     document.getElementById('editProntuarioConduta').value = prontuario.conduta || '';
-    document.getElementById('editProntuarioPrioridade').value = prontuario.prioridade;
-    document.getElementById('editProntuarioRegistro').value = prontuario.registroProfissional || 'Não informado';
+    document.getElementById('editProntuarioPrioridade').value = prontuario.prioridade || 'Normal';
+    
+    document.getElementById('editProntuarioRegistro').textContent = prontuario.registroProfissional || 'Não informado';
 
-    // 5. Carimbo
     const imgCarimbo = document.getElementById('editProntuarioCarimboView');
     const wrapper = document.getElementById('wrapperCarimboVisualizar');
-    if (prontuario.carimboAssinatura) {
+    if (prontuario.carimboAssinatura && prontuario.carimboAssinatura !== "") {
         imgCarimbo.src = prontuario.carimboAssinatura;
         wrapper.classList.remove('d-none');
     } else {
@@ -458,28 +776,53 @@ function salvarEdicaoProntuario() {
     }
 }
 
-// --- INICIALIZAÇÃO DO ECOSSISTEMA ---
-
+// --- ECOSSISTEMA DO DOM ---
 document.addEventListener('DOMContentLoaded', () => {
     try { carregarDadosPerfil(); } catch(e){}
     try { renderizarTabelaProntuarios(); } catch(e){}
-    try { atualizarDropdownPacientes(); } catch(e){}
+    try { atualizarDropdowns(); } catch(e){}
     try { renderizarTabelaPacientes(); } catch(e){}
+    
+    // Atualização Inicial das 4 Tabelas de Consultas
+    try { renderizarTabelaConsultas(); } catch(e){}
+    try { renderizarTabelaConsultasConcluidas(); } catch(e){}
+    try { renderizarMinhasConsultas(); } catch(e){}
+    try { renderizarMinhasConsultasConcluidas(); } catch(e){}
 
-    // Listeners de Busca Dinâmica
     const inputBusca = document.getElementById('buscaPaciente');
     if (inputBusca) inputBusca.addEventListener('input', renderizarTabelaProntuarios);
 
     const inputBuscaPacientes = document.getElementById('buscaPacienteLista');
     if (inputBuscaPacientes) inputBuscaPacientes.addEventListener('input', renderizarTabelaPacientes);
 
-    // Atualização sob demanda das tabelas e seletores ao alternar abas do Bootstrap
+    const inputBuscaConsultas = document.getElementById('buscaConsulta');
+    if (inputBuscaConsultas) inputBuscaConsultas.addEventListener('input', renderizarTabelaConsultas);
+
+    const inputBuscaConcluidas = document.getElementById('buscaConsultaConcluida');
+    if (inputBuscaConcluidas) inputBuscaConcluidas.addEventListener('input', renderizarTabelaConsultasConcluidas);
+
     const botaoAbaHistorico = document.getElementById('tab-historico-prontuarios');
     if (botaoAbaHistorico) botaoAbaHistorico.addEventListener('shown.bs.tab', renderizarTabelaProntuarios);
 
     const botaoAbaPacientes = document.getElementById('tab-pacientes-cadastrados');
-    if (botaoAbaPacientes) botaoAbaPacientes.addEventListener('shown.bs.tab', renderizarTabelaPacientes);
+    if (botaoAbaPacientes) document.getElementById('tab-pacientes-cadastrados').addEventListener('shown.bs.tab', renderizarTabelaPacientes);
+
+    const botaoAbaConsultas = document.getElementById('tab-consultas-agendadas');
+    if (botaoAbaConsultas) botaoAbaConsultas.addEventListener('shown.bs.tab', renderizarTabelaConsultas);
+
+    const botaoAbaConcluidas = document.getElementById('tab-consultas-concluidas');
+    if (botaoAbaConcluidas) botaoAbaConcluidas.addEventListener('shown.bs.tab', renderizarTabelaConsultasConcluidas);
 
     const botaoAbaNovoProntuario = document.getElementById('tab-novo-prontuario');
-    if (botaoAbaNovoProntuario) botaoAbaNovoProntuario.addEventListener('shown.bs.tab', atualizarDropdownPacientes);
+    if (botaoAbaNovoProntuario) botaoAbaNovoProntuario.addEventListener('shown.bs.tab', atualizarDropdowns);
+    
+    const botaoAbaNovaConsulta = document.getElementById('tab-nova-consulta');
+    if (botaoAbaNovaConsulta) botaoAbaNovaConsulta.addEventListener('shown.bs.tab', atualizarDropdowns);
+    
+    // Atualiza a tabela caso o perfil mude ou seja clicado
+    const botaoAbaPerfil = document.getElementById('tab-perfil-aba');
+    if (botaoAbaPerfil) botaoAbaPerfil.addEventListener('shown.bs.tab', () => {
+        renderizarMinhasConsultas();
+        renderizarMinhasConsultasConcluidas();
+    });
 });
