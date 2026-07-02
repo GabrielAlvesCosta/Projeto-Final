@@ -4,9 +4,23 @@ const formEditar = document.getElementById("formEditar");
 const fecharBtn = document.querySelector(".fechar");
 
 function carregarUsuarios() {
-    const usuarios = JSON.parse(localStorage.getItem("usuarios")) || [];
+    let usuarios = JSON.parse(localStorage.getItem("usuarios")) || [];
+
+    if (usuarios.length === 0 && Array.isArray(window.initialUsuarios) && window.initialUsuarios.length > 0) {
+        usuarios = window.initialUsuarios;
+        localStorage.setItem("usuarios", JSON.stringify(usuarios));
+    }
 
     lista.innerHTML = "";
+
+    if (usuarios.length === 0) {
+        lista.innerHTML = `
+            <tr>
+                <td colspan="8">Nenhum usuário cadastrado.</td>
+            </tr>
+        `;
+        return;
+    }
 
     usuarios.forEach((usuario) => {
         const linha = document.createElement("tr");

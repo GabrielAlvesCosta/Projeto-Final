@@ -7,38 +7,93 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-
-    <div class="container table-wrapper">
+    <div class="container">
         <h1>Lista de Usuários</h1>
 
-        <table>
-            <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Nome</th>
-                    <th>E-mail</th>
-                    <th>Cargo</th>
-                    <th>CRM/COREM</th>
-                    <th>Admin</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for usuario_item in usuarios %}
+        <div class="table-wrapper">
+            <table>
+                <thead>
                     <tr>
-                        <td>{{ usuario_item[0] }}</td>
-                        <td>{{ usuario_item[1] }}</td>
-                        <td>{{ usuario_item[2] }}</td>
-                        <td>{{ usuario_item[3] }}</td>
-                        <td>{{ usuario_item[4] }}</td>
-                        <td>{{ 'Sim' if usuario_item[6] == 'sim' else 'Não' }}</td>
+                        <th>ID</th>
+                        <th>Nome</th>
+                        <th>E-mail</th>
+                        <th>Senha</th>
+                        <th>Cargo</th>
+                        <th>CRM/COREM</th>
+                        <th>Administrador</th>
+                        <th>Ações</th>
                     </tr>
-                {% else %}
+                </thead>
+                <tbody id="listaUsuarios">
+                    {% for usuario in usuarios %}
                     <tr>
-                        <td colspan="6">Nenhum usuário cadastrado.</td>
+                        <td>{{ usuario.id }}</td>
+                        <td>{{ usuario.nome }}</td>
+                        <td>{{ usuario.email }}</td>
+                        <td>{{ usuario.senha or '-' }}</td>
+                        <td>{{ usuario.cargo }}</td>
+                        <td>{{ usuario.crm_coren or '-' }}</td>
+                        <td>{{ 'Sim' if usuario.admin == 'sim' else 'Não' }}</td>
+                        <td>
+                            <button class="btn-editar" onclick="abrirModal({{ usuario.id }})">Editar</button>
+                            <button class="btn-excluir" onclick="excluirUsuario({{ usuario.id }})">Excluir</button>
+                        </td>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% else %}
+                    <tr>
+                        <td colspan="8">Nenhum usuário cadastrado.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
+
+    <script>
+        window.initialUsuarios = {{ usuarios|tojson }};
+    </script>
+
+    <!-- Modal de Edição -->
+    <div id="modalEditar" class="modal">
+        <div class="modal-content">
+            <span class="fechar">&times;</span>
+            <h2>Editar Usuário</h2>
+            <form id="formEditar">
+                <input type="hidden" id="editId">
+                
+                <label for="editNome">Nome:</label>
+                <input type="text" id="editNome" required>
+
+                <label for="editEmail">E-mail:</label>
+                <input type="email" id="editEmail" required>
+
+                <label for="editSenha">Senha:</label>
+                <input type="password" id="editSenha" required>
+
+                <label for="editCargo">Cargo:</label>
+                <input type="text" id="editCargo" maxlength="30" title="Máximo 30 caracteres" required>
+
+                <label for="editCrmCorem">CRM/COREM:</label>
+                <input type="text" id="editCrmCorem" placeholder="Digite o CRM ou COREM">
+
+                <label>Administrador?</label>
+                <div class="opcao-admin">
+                    <label>
+                        <input type="radio" name="editAdmin" value="sim">
+                        Sim
+                    </label>
+                    <label>
+                        <input type="radio" name="editAdmin" value="nao" checked>
+                        Não
+                    </label>
+                </div>
+
+                <button type="submit">Salvar Alterações</button>
+                <button type="button" class="btn-cancelar" onclick="fecharModal()">Cancelar</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="{{ url_for('static', filename='js/usuarios.js') }}"></script>
 </body>
 </html>

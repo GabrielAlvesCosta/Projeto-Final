@@ -21,7 +21,7 @@ body{
     min-height: 100vh;
     background: #f9fafb;
     padding: 20px;
-    background-image: url("img/fundo.png");
+    background-image: url("/Static/img/fundo.jpeg");
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;

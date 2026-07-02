@@ -11,7 +11,7 @@ body {
     justify-content: center;
     align-items: center;      /* Centraliza na vertical */
     min-height: 100vh;        /* Ocupa a altura inteira da tela */
-    background-image: url("img/fundo.jpeg");
+    background-image: url("/Static/img/fundo.jpeg");
     background-repeat: no-repeat;
     background-size: cover;
     background-position: center;

@@ -11,7 +11,7 @@ class AuthController:
             nome = request.form.get("nome", "").strip()
             email = request.form.get("email", "").strip()
             cargo = request.form.get("cargo", "").strip()
-            crm_coren = request.form.get("crm_coren", "").strip()
+            crm_coren = (request.form.get("crm_coren") or request.form.get("crm_corem") or "").strip()
             senha = request.form.get("senha", "").strip()
 
             if not nome or not email or not cargo or not crm_coren or not senha:
@@ -106,6 +106,18 @@ class AuthController:
             return redirect(url_for("login"))
 
         usuarios = Usuario.listar_todos()
+        usuarios = [
+            {
+                "id": usuario[0],
+                "nome": usuario[1],
+                "email": usuario[2],
+                "cargo": usuario[3],
+                "crm_coren": usuario[4],
+                "senha": usuario[5],
+                "admin": usuario[6] if len(usuario) > 6 else "nao",
+            }
+            for usuario in usuarios
+        ]
         return render_template(
             "usuarios.html",
             usuario=session["usuario"],

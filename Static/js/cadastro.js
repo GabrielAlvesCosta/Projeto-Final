@@ -32,34 +32,37 @@ senhaInput.addEventListener("input", validarSenha);
 confirmarInput.addEventListener("input", validarSenha);
 
 form.addEventListener("submit", (e) => {
-    e.preventDefault();
-
     const nome = document.getElementById("nome").value.trim();
     const email = document.getElementById("email").value.trim();
     const senha = senhaInput.value;
     const confirmarSenha = confirmarInput.value;
     const cargo = document.getElementById("cargo").value.trim();
-    const crm_corem = document.getElementById("crm_corem").value.trim();
-    const admin = document.querySelector("input[name='admin']:checked").value;
+    const crm_coren = document.getElementById("crm_coren").value.trim();
+    const adminRadio = document.querySelector("input[name='admin']:checked");
+    const admin = adminRadio ? adminRadio.value : "nao";
 
     if (cargo.length > 30) {
+        e.preventDefault();
         alert("O cargo deve ter no máximo 30 caracteres.");
         return;
     }
 
     if (senha.length < 6) {
+        e.preventDefault();
         senhaErro.classList.add("active");
         senhaInput.classList.add("invalid");
         return;
     }
 
     if (senha !== confirmarSenha) {
+        e.preventDefault();
         confirmarErro.classList.add("active");
         confirmarInput.classList.add("invalid");
         return;
     }
 
     if (!validarSenha()) {
+        e.preventDefault();
         return;
     }
 
@@ -71,12 +74,9 @@ form.addEventListener("submit", (e) => {
         email,
         senha,
         cargo,
-        crm_corem,
+        crm_coren,
         admin
     });
 
     localStorage.setItem("usuarios", JSON.stringify(usuarios));
-
-    alert("Usuário cadastrado com sucesso!");
-    form.reset();
 });
