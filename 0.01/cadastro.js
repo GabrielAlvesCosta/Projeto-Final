@@ -3,133 +3,98 @@ document.addEventListener("DOMContentLoaded", () => {
 
     function validaCPF(cpf) {
         cpf = cpf.replace(/\D/g, '');
-        if (cpf.length !== 11 || /^([0-9])\1{10}$/.test(cpf)) {
-            return false;
-        }
-        let soma = 0;
-        let resto;
-        for (let i = 1; i <= 9; i++) {
-            soma += parseInt(cpf.substring(i - 1, i), 10) * (11 - i);
-        }
+        if (cpf.length !== 11 || /^([0-9])\1{10}$/.test(cpf)) return false;
+        let soma = 0, resto;
+        for (let i = 1; i <= 9; i++) soma += parseInt(cpf.substring(i - 1, i), 10) * (11 - i);
         resto = (soma * 10) % 11;
         if (resto === 10 || resto === 11) resto = 0;
         if (resto !== parseInt(cpf.substring(9, 10), 10)) return false;
         soma = 0;
-        for (let i = 1; i <= 10; i++) {
-            soma += parseInt(cpf.substring(i - 1, i), 10) * (12 - i);
-        }
+        for (let i = 1; i <= 10; i++) soma += parseInt(cpf.substring(i - 1, i), 10) * (12 - i);
         resto = (soma * 10) % 11;
         if (resto === 10 || resto === 11) resto = 0;
         if (resto !== parseInt(cpf.substring(10, 11), 10)) return false;
         return true;
     }
 
-    function validaSenha(senha) {
-        return senha.length >= 8 &&
-            /[a-z]/.test(senha) &&
-            /[A-Z]/.test(senha) &&
-            /[0-9]/.test(senha) &&
-            /[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?]/.test(senha);
-    }
+    if (form) {
+        form.addEventListener("submit", async (event) => {
+            event.preventDefault();
 
-    function validaEmail(email) {
-        return /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/.test(email);
-    }
+            // Captura segura (evita quebra se o campo não existir no HTML de Maquinaria)
+            const nomeInput = document.getElementById("name");
+            const cpfInput = document.getElementById("cpf");
+            const emailInput = document.getElementById("email");
+            const phoneInput = document.getElementById("phone");
+            const addressInput = document.getElementById("address");
+            const passwordInput = document.getElementById("password");
+            const confirmPasswordInput = document.getElementById("confirm-password");
+            const operatedInput = document.getElementById("operated");
 
-    function validaTelefone(telefone) {
-        const digitos = telefone.replace(/\D/g, '');
-        return digitos.length === 11;
-    }
+            const nome = nomeInput ? nomeInput.value.trim() : "";
+            let cpf = cpfInput ? cpfInput.value.trim().replace(/\D/g, '') : "";
+            const email = emailInput ? emailInput.value.trim() : "";
+            const telefone = phoneInput ? phoneInput.value.trim() : "";
+            const endereco = addressInput ? addressInput.value.trim() : "";
+            const senha = passwordInput ? passwordInput.value.trim() : "";
+            const confirmaSenha = confirmPasswordInput ? confirmPasswordInput.value.trim() : "";
+            const tipo = operatedInput ? operatedInput.value : "nao";
 
-    function validaNomeCompleto(nome) {
-        const conectores = ['da', 'de', 'do', 'dos', 'das', 'e'];
-        const partes = nome.trim().split(' ').filter(Boolean);
-        if (partes.length < 2) return false;
-        return partes.every(palavra => {
-            if (conectores.includes(palavra.toLowerCase())) {
-                return true;
+            let erros = [];
+            if (!validaCPF(cpf)) erros.push('CPF inválido.');
+            if (senha.length < 6) erros.push('A senha deve ter pelo menos 6 caracteres.');
+            if (senha !== confirmaSenha) erros.push('As senhas não coincidem.');
+
+            if (erros.length > 0) {
+                alert(erros.join('\n'));
+                return;
             }
-            return /^[A-ZÀ-ÖØ-Þ][a-zà-öø-ÿ]+$/.test(palavra);
+
+            const userData = {
+                nome,
+                cpf,
+                email,
+                telefones: telefone ? [telefone] : [], 
+                enderecos: endereco ? [endereco] : [],
+                senha,
+                tipo
+            };
+
+            const fileInput = document.getElementById("photo");
+
+            const finalizarCadastro = async (dadosParaSalvar) => {
+                try {
+                    const response = await fetch('/api/usuarios', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(dadosParaSalvar)
+                    });
+
+                    const resultado = await response.json();
+
+                    if (response.ok) {
+                        localStorage.setItem('lastRegisteredCPF', cpf);
+                        alert('Cadastro realizado com sucesso via servidor Python! Redirecionando...');
+                        window.location.href = 'login.html';
+                    } else {
+                        alert(resultado.msg || 'Erro ao realizar o cadastro no servidor.');
+                    }
+                } catch (error) {
+                    console.error("Erro na API:", error);
+                    alert('Erro de comunicação. Garanta que o Flask (app.py) esteja em execução.');
+                }
+            };
+
+            if (fileInput && fileInput.files && fileInput.files[0]) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    userData.foto = e.target.result; 
+                    finalizarCadastro(userData);
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            } else {
+                finalizarCadastro(userData);
+            }
         });
     }
-
-    function validaEndereco(endereco) {
-        const enderecoTrim = endereco.trim();
-        return enderecoTrim.length >= 8 && /\d/.test(enderecoTrim);
-    }
-
-    form.addEventListener("submit", (e) => {
-        e.preventDefault();
-        const nome = document.getElementById("name").value.trim();
-        const cpf = document.getElementById("cpf").value.replace(/\D/g, "");
-        const email = document.getElementById("email").value.trim();
-        const telefone = document.getElementById("telefone").value.trim();
-        const endereco = document.getElementById("endereco").value.trim();
-        const senha = document.getElementById("password").value.trim();
-        const confirmarSenha = document.getElementById("confirm-password").value.trim();
-
-        const erros = [];
-        if (nome === '' || !validaNomeCompleto(nome)) {
-            erros.push('Informe seu nome completo corretamente (nome e sobrenome com inicial maiúscula).');
-        }
-        if (!validaCPF(cpf)) {
-            erros.push('CPF inválido. Digite 11 números válidos.');
-        } else if (localStorage.getItem(cpf)) {
-            erros.push('Este CPF já está cadastrado.');
-        }
-        if (!validaEmail(email)) {
-            erros.push('E-mail inválido.');
-        }
-        if (!validaTelefone(telefone)) {
-            erros.push('Telefone inválido. Use o DDD e o número com 11 dígitos.');
-        }
-        if (!validaEndereco(endereco)) {
-            erros.push('Endereço inválido. Informe rua/avenida e número.');
-        }
-        if (!validaSenha(senha)) {
-            erros.push('Senha fraca. Use mínimo 8 caracteres, incluindo maiúscula, minúscula, número e símbolo.');
-        }
-        if (senha !== confirmarSenha) {
-            erros.push('As senhas não coincidem.');
-        }
-
-        if (erros.length > 0) {
-            alert(erros.join('\n'));
-            return;
-        }
-
-        const userData = {
-            nome,
-            cpf,
-            email,
-            // Convertendo telefone e endereco para arrays, para bater com a lógica do seu Painel!
-            telefones: [telefone], 
-            enderecos: [endereco],
-            senha,
-            tipo: document.getElementById("operated").value || 'nao' // Pega o select de operador
-        };
-
-        const fileInput = document.getElementById("photo");
-
-        // Função para finalizar o cadastro
-        const finalizarCadastro = (dadosParaSalvar) => {
-            localStorage.setItem(cpf, JSON.stringify(dadosParaSalvar));
-            localStorage.setItem('lastRegisteredCPF', cpf);
-            alert('Cadastro realizado com sucesso! Agora faça o login.');
-            window.location.href = 'login.html';
-        };
-
-        // Verifica se o usuário anexou uma foto
-        if (fileInput.files && fileInput.files[0]) {
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                userData.foto = e.target.result; // Salva a imagem em base64 no userData
-                finalizarCadastro(userData);
-            };
-            reader.readAsDataURL(fileInput.files[0]);
-        } else {
-            // Se não enviou foto, salva sem foto mesmo
-            finalizarCadastro(userData);
-        }
-    });
 });

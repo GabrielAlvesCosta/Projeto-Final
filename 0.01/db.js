@@ -1,40 +1,74 @@
 // ====================================================================
-// db.js - BASE DE DADOS LOCAL E AUTENTICAÇÃO DO PAINEL CLÍNICO (PEP)
+// db.js - ADAPTADO PARA O BACKEND PYTHON (API REST FLASK)
 // ====================================================================
 
-// Prontuários médicos de teste para inicializar o sistema de forma realista
-// Inicialização segura do banco unificado utilizando a ID 'bancoProntuarios'
-if (!localStorage.getItem('bancoProntuarios')) {
-    localStorage.setItem('bancoProntuarios', JSON.stringify(prontuariosIniciais));
-}
-
 const DB = {
-    // --- GERENCIAMENTO DE PRONTUÁRIOS CLÍNICOS ---
-    buscarTodos: () => JSON.parse(localStorage.getItem('bancoProntuarios')) || [],
-    
-    salvarProntuario: (novoProntuario) => {
-        const atual = DB.buscarTodos();
-        atual.unshift(novoProntuario); // Adiciona no início para aparecer primeiro no histórico
-        localStorage.setItem('bancoProntuarios', JSON.stringify(atual));
+    // --- GERENCIAMENTO DE PRONTUÁRIOS CLÍNICOS (AGORA VIA BACKEND) ---
+    buscarTodos: async () => {
+        try {
+            const response = await fetch('/api/prontuarios');
+            if (!response.ok) {
+                throw new Error("Erro ao buscar prontuários do servidor remoto.");
+            }
+            return await response.json();
+        } catch (error) {
+            console.error("Erro na API de prontuários (buscarTodos):", error);
+            return [];
+        }
     },
-
-    atualizarProntuario: (prontuarioAtualizado) => {
-        const atual = DB.buscarTodos();
-        const index = atual.findIndex(p => p.id === prontuarioAtualizado.id);
-        if (index !== -1) {
-            atual[index] = prontuarioAtualizado;
-            localStorage.setItem('bancoProntuarios', JSON.stringify(atual));
+    
+    salvarProntuario: async (novoProntuario) => {
+        try {
+            const response = await fetch('/api/prontuarios', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(novoProntuario)
+            });
+            if (!response.ok) {
+                throw new Error("Erro ao enviar novo prontuário ao servidor.");
+            }
+            return await response.json();
+        } catch (error) {
+            console.error("Erro na API de prontuários (salvarProntuario):", error);
+            alert("Não foi possível salvar o registro clínico no servidor central.");
         }
     },
 
-    removerProntuario: (id) => {
-        const atual = DB.buscarTodos();
-        const filtrado = atual.filter(prontuario => prontuario.id !== id);
-        localStorage.setItem('bancoProntuarios', JSON.stringify(filtrado));
+    atualizarProntuario: async (prontuarioAtualizado) => {
+        try {
+            const response = await fetch('/api/prontuarios', {
+                method: 'PUT',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(prontuarioAtualizado)
+            });
+            if (!response.ok) {
+                throw new Error("Erro ao atualizar evolução no servidor.");
+            }
+            return await response.json();
+        } catch (error) {
+            console.error("Erro na API de prontuários (atualizarProntuario):", error);
+            alert("Não foi possível salvar a atualização clínica no servidor central.");
+        }
     },
 
-    // --- CONTROLE DE ACESSO E USUÁRIOS (PROFISSIONAIS) ---
-    getUsuario: (cpf) => JSON.parse(localStorage.getItem(cpf)),
+    removerProntuario: async (id) => {
+        // Como o app.py centraliza os dados e não costuma expor a remoção direta
+        // por conformidade médica e auditoria de PEP, deixamos um aviso estrutural.
+        console.warn("Aviso: A exclusão de prontuários médicos deve ser configurada via rota DELETE específica no app.py backend se requisitada.");
+    },
+
+    // --- CONTROLE DE ACESSO E SESSÃO LOCAL (MANTIDO PARA DESEMPENHO IMEDIATO) ---
+    getUsuario: (cpf) => {
+        try {
+            return JSON.parse(localStorage.getItem(cpf));
+        } catch (e) {
+            return null;
+        }
+    },
 
     getUsuarioLogado: () => {
         const cpf = localStorage.getItem('loggedInUserCPF');
@@ -46,7 +80,7 @@ const DB = {
         window.location.replace('login.html');
     },
 
-    // --- SEÇÃO DE ACOMPANHAMENTO VITAL (ANTIGO FAVORITOS/SALVOS) ---
+    // --- SEÇÃO DE ACOMPANHAMENTO VITAL (MONITORAMENTO ESPECIAL) ---
     toggleFavorito: (idProntuario) => {
         const user = DB.getUsuarioLogado();
         if (!user) {
@@ -59,7 +93,7 @@ const DB = {
         let isSaved = false;
         
         if (index > -1) {
-            user.salvos.splice(index, 1); // Remove do monitoramento especial
+            user.salvos.splice(index, 1); // Remove do monitoramento prioritário
         } else {
             user.salvos.push(idProntuario); // Adiciona para monitoramento prioritário
             isSaved = true;
@@ -74,23 +108,21 @@ const DB = {
         return user && user.salvos && user.salvos.includes(idProntuario);
     },
 
-    getProntuariosFavoritos: () => {
+    getProntuariosFavoritos: async () => {
         const user = DB.getUsuarioLogado();
         if (!user || !user.salvos) return [];
         
-        const todos = DB.buscarTodos();
+        const todos = await DB.buscarTodos();
         return todos.filter(prontuario => user.salvos.includes(prontuario.id));
     },
 
     // ====================================================================
-    // COMPATIBILIDADE RETROATIVA (MECANISMO ANTIFALHAS DE REDIRECIONAMENTO)
+    // COMPATIBILIDADE RETROATIVA (MAPEAMENTO ASSÍNCRONO INTEGRADO)
     // ====================================================================
-    // Caso alguma outra página legada chame os termos antigos de anúncios,
-    // as funções abaixo convertem e gravam os dados no novo padrão de prontuários.
-    listar: () => DB.buscarTodos(),
-    salvarAnuncio: (dados) => DB.salvarProntuario(dados),
-    removerAnuncio: (id) => DB.removerProntuario(id),
-    getAnunciosSalvos: () => DB.getProntuariosFavoritos(),
+    listar: async () => await DB.buscarTodos(),
+    salvarAnuncio: async (dados) => await DB.salvarProntuario(dados),
+    removerAnuncio: async (id) => await DB.removerProntuario(id),
+    getAnunciosSalvos: async () => await DB.getProntuariosFavoritos(),
     toggleSalvo: (id) => DB.toggleFavorito(id),
     isSalvo: (id) => DB.isFavorito(id)
 };
@@ -101,7 +133,7 @@ const DB = {
 document.addEventListener("DOMContentLoaded", () => {
     const authContainer = document.getElementById("auth-container");
     
-    // Se a página atual não possuir o container de autenticação na navbar, o script prossegue sem erros
+    // Evita interrupção caso a página atual não possua o container de autenticação
     if (!authContainer) return;
 
     const usuarioLogado = DB.getUsuarioLogado();
@@ -109,5 +141,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (usuarioLogado) {
         // Extrai o primeiro nome do profissional para exibição limpa
         const primeiroNome = usuarioLogado.nome ? usuarioLogado.nome.split(' ')[0] : 'Profissional';
-
         authContainer.innerHTML = `<span>Bem-vindo, ${primeiroNome}!</span>`;
+    }
+});

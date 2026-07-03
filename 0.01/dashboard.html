@@ -12,7 +12,7 @@
         .nav-tabs .nav-link.active { font-weight: bold; }
         .object-fit-cover { object-fit: cover; }
 
-        /* === REGRA PARA LIMITAR A 10 LINHAS COM SCROLLBAR (Tabelas Normais) === */
+        /* === CONFIGURAÇÃO DE SCROLLBAR ELEGANTE PARA ATÉ 10 LINHAS === */
         .table-scroll-container {
             max-height: 560px;
             overflow-y: auto;
@@ -31,9 +31,9 @@
         .table-scroll-container::-webkit-scrollbar-thumb { background: #c1c1c1; border-radius: 10px; }
         .table-scroll-container::-webkit-scrollbar-thumb:hover { background: #a8a8a8; }
 
-        /* === NOVA REGRA PARA LIMITAR A 4 LINHAS (Aba Meu Perfil) === */
+        /* === CONFIGURAÇÃO DE SCROLLBAR PARA ATÉ 4 LINHAS (ABA PERFIL) === */
         .table-scroll-short {
-            max-height: 260px; /* Altura exata para cabeçalho + 4 linhas */
+            max-height: 260px;
             overflow-y: auto;
             border: 1px solid #dee2e6;
             border-radius: 4px;
@@ -100,7 +100,7 @@
                     </li>
                     <li class="nav-item">
                         <button class="nav-link" id="tab-consultas-concluidas" data-bs-toggle="tab" data-bs-target="#pane-consultas-concluidas" type="button" role="tab">
-                            <i class="bi bi-archive"></i> Consultas Concluídas
+                            <i class="bi bi-calendar-x"></i> Consultas Concluídas
                         </button>
                     </li>
                     <li class="nav-item">
@@ -145,13 +145,42 @@
                             </div>
                         </div>
 
-                        <hr class="my-5 text-muted">
-                        <h4 class="mb-4 text-primary"><i class="bi bi-journal-medical"></i> Meu Painel de Atendimentos</h4>
+                        <div class="row mt-5">
+                            <div class="col-12">
+                                <h5 class="text-secondary border-bottom pb-2"><i class="bi bi-speedometer2"></i> Meu Painel de Atendimentos</h5>
+                                <div class="row g-3 mt-2">
+                                    <div class="col-md-4">
+                                        <div class="card bg-light border-0 shadow-sm">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted mb-1">Consultas Ativas</h6>
+                                                <h2 id="count-consultas-ativas" class="text-primary fw-bold">0</h2>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light border-0 shadow-sm">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted mb-1">Consultas Concluídas</h6>
+                                                <h2 id="count-consultas-concluidas" class="text-success fw-bold">0</h2>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-4">
+                                        <div class="card bg-light border-0 shadow-sm">
+                                            <div class="card-body text-center">
+                                                <h6 class="text-muted mb-1">Prontuários Eletrônicos (PEP)</h6>
+                                                <h2 id="count-prontuarios" class="text-danger fw-bold">0</h2>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
-                        <div class="row g-4">
+                        <div class="row g-4 mt-3">
                             <div class="col-lg-6">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="text-primary mb-0"><i class="bi bi-calendar2-check"></i> Consultas Agendadas</h5>
+                                    <h5 class="text-primary mb-0"><i class="bi bi-calendar2-check"></i> Minhas Consultas Agendadas</h5>
                                 </div>
                                 <div class="table-responsive table-scroll-short">
                                     <table class="table table-hover align-middle mb-0">
@@ -170,7 +199,7 @@
 
                             <div class="col-lg-6">
                                 <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <h5 class="text-secondary mb-0"><i class="bi bi-archive"></i> Histórico (Concluídas/Canceladas)</h5>
+                                    <h5 class="text-secondary mb-0"><i class="bi bi-archive"></i> Meu Histórico (Concluídas)</h5>
                                 </div>
                                 <div class="table-responsive table-scroll-short">
                                     <table class="table table-hover align-middle mb-0">
@@ -232,7 +261,7 @@
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Cartão SUS / Convênio</label>
-                                    <input type="text" id="pacienteCartao" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Apenas números" required>
+                                    <input type="text" id="pacienteCartao" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Número da carteira" required>
                                 </div>
                                 <div class="col-12 mt-4">
                                     <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Cadastrar Paciente</button>
@@ -247,7 +276,7 @@
                             <div class="w-25"><input type="text" id="buscaPacienteLista" class="form-control" placeholder="Buscar por nome..."></div>
                         </div>
                         <div class="table-responsive table-scroll-container">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Nome</th>
@@ -295,11 +324,11 @@
 
                     <div class="tab-pane fade" id="pane-consultas-lista" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="text-primary mb-0"><i class="bi bi-calendar-week"></i> Mural de Consultas Ativas (Todas)</h4>
+                            <h4 class="text-primary mb-0"><i class="bi bi-calendar-week"></i> Mural de Consultas Compartilhado (Ativas)</h4>
                             <div class="w-25"><input type="text" id="buscaConsulta" class="form-control" placeholder="Buscar paciente ou médico..."></div>
                         </div>
                         <div class="table-responsive table-scroll-container">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Paciente</th>
@@ -316,11 +345,11 @@
 
                     <div class="tab-pane fade" id="pane-consultas-concluidas" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="text-primary mb-0"><i class="bi bi-archive-fill"></i> Histórico de Consultas Concluídas / Canceladas (Todas)</h4>
-                            <div class="w-25"><input type="text" id="buscaConsultaConcluida" class="form-control" placeholder="Buscar paciente ou médico..."></div>
+                            <h4 class="text-success mb-0"><i class="bi bi-calendar-check-fill"></i> Histórico de Consultas Finalizadas e Canceladas</h4>
+                            <div class="w-25"><input type="text" id="buscaConsultaConcluida" class="form-control" placeholder="Buscar no histórico..."></div>
                         </div>
                         <div class="table-responsive table-scroll-container">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Paciente</th>
@@ -369,7 +398,6 @@
                                 </div>
 
                                 <div class="col-12"><hr><h5 class="text-secondary">Sinais Vitais (Triagem)</h5></div>
-
                                 <div class="col-md-2">
                                     <label class="form-label small fw-bold">P.A. (mmHg)</label>
                                     <input type="text" id="prontuarioPA" class="form-control" oninput="this.value = this.value.replace(/[^0-9/]/g, '')" placeholder="120/80">
@@ -406,7 +434,7 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Alergias Conhecidas</label>
-                                    <textarea id="prontuarioAlergias" class="form-control" rows="2" placeholder="Nega alergias ou listar..."></textarea>
+                                    <textarea id="prontuarioAlergias" class="form-control" rows="2" placeholder="Nega alergias..."></textarea>
                                 </div>
 
                                 <div class="col-md-4">
@@ -454,11 +482,11 @@
 
                     <div class="tab-pane fade" id="pane-historico-prontuarios" role="tabpanel">
                         <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h4 class="text-primary mb-0"><i class="bi bi-archive-fill"></i> Repositório de Prontuários Eletrônicos</h4>
+                            <h4 class="text-primary mb-0"><i class="bi bi-archive-fill"></i> Repositório de Prontuários Eletrônicos (PEP)</h4>
                             <div class="w-25"><input type="text" id="buscaPaciente" class="form-control" placeholder="Filtrar por nome do paciente..."></div>
                         </div>
                         <div class="table-responsive table-scroll-container">
-                            <table class="table table-hover align-middle mb-0">
+                            <table class="table table-hover align-middle">
                                 <thead class="table-light">
                                     <tr>
                                         <th>Paciente / Atendimento</th>
@@ -599,13 +627,10 @@
                         </div>
                     </div>
 
-                    <div class="d-flex align-items-center justify-content-between p-3 bg-white rounded border small mt-3">
-                        <div class="d-flex flex-column">
-                            <div><strong>Status do Registro:</strong> <span class="badge bg-success"><i class="bi bi-shield-check"></i> Prontuário Autenticado</span></div>
-                            <div class="mt-1 text-muted"><strong>Registro Profissional:</strong> <span id="editProntuarioRegistro" class="fw-bold text-dark"></span></div>
-                        </div>
+                    <div class="d-flex align-items-center justify-content-between p-2 bg-white rounded border small">
+                        <div><strong>Assinado por:</strong> <span id="editProntuarioRegistro" class="badge bg-secondary"></span></div>
                         <div id="wrapperCarimboVisualizar" class="d-none">
-                            <img id="editProntuarioCarimboView" src="" class="img-fluid border rounded" style="max-height: 60px;" title="Assinatura Digitalizada">
+                            <img id="editProntuarioCarimboView" src="" class="img-fluid border rounded" style="max-height: 50px;">
                         </div>
                     </div>
 
