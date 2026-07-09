@@ -1,29 +1,100 @@
 from flask import Flask, request, jsonify
-import json
+import sqlite3
 import os
-import time
 from datetime import datetime
 
-# Configura o Flask para servir os arquivos estáticos da mesma pasta
 app = Flask(__name__, static_folder='.', static_url_path='')
-DB_FILE = 'banco_clinica.json'
+DB_FILE = 'clinica.db'
 
-def carregar_banco():
-    if not os.path.exists(DB_FILE):
-        return {"pacientes": [], "consultas": [], "prontuarios": [], "usuarios": []}
-    with open(DB_FILE, 'r', encoding='utf-8') as f:
-        try:
-            db = json.load(f)
-            # Garante que a chave de usuários exista no arquivo JSON
-            if "usuarios" not in db:
-                db["usuarios"] = []
-            return db
-        except:
-            return {"pacientes": [], "consultas": [], "prontuarios": [], "usuarios": []}
+def get_db():
+    conn = sqlite3.connect(DB_FILE)
+    # Permite retornar os resultados do banco de dados como Dicionários (facilita pro JSON)
+    conn.row_factory = sqlite3.Row
+    return conn
 
-def salvar_banco(db):
-    with open(DB_FILE, 'w', encoding='utf-8') as f:
-        json.dump(db, f, indent=4, ensure_ascii=False)
+def init_db():
+    with get_db() as conn:
+        c = conn.cursor()
+        
+        # 1. Tabela de Usuários (Profissionais)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS usuarios (
+                cpf TEXT PRIMARY KEY,
+                nome TEXT,
+                email TEXT,
+                senha TEXT,
+                foto TEXT
+            )
+        ''')
+        
+        # 2. Tabela de Pacientes (Nomes exatos do dashboard.js)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS pacientes (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                nome TEXT,
+                dataNasc TEXT,
+                genero TEXT,
+                idadeAnos TEXT,
+                idadeMeses TEXT,
+                idadeDias TEXT,
+                documento TEXT,
+                cartao TEXT
+            )
+        ''')
+        
+        # 3. Tabela de Consultas (Nomes exatos do dashboard.js)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS consultas (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pacienteId INTEGER,
+                nomePaciente TEXT,
+                data TEXT,
+                horario TEXT,
+                profissional TEXT,
+                status TEXT
+            )
+        ''')
+        
+        # 4. Tabela de Prontuários PEP (Nomes exatos do dashboard.js - 30 colunas!)
+        c.execute('''
+            CREATE TABLE IF NOT EXISTS prontuarios (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                pacienteId INTEGER,
+                nomePaciente TEXT,
+                dataNascimento TEXT,
+                genero TEXT,
+                idadeAnos TEXT,
+                idadeMeses TEXT,
+                idadeDias TEXT,
+                documento TEXT,
+                convenioCartao TEXT,
+                acompanhante TEXT,
+                especialidade TEXT,
+                tipoAtendimento TEXT,
+                prioridade TEXT,
+                registroProfissional TEXT,
+                carimboAssinatura TEXT,
+                qp TEXT,
+                hda TEXT,
+                hmp TEXT,
+                alergias TEXT,
+                sinalPA TEXT,
+                sinalFC TEXT,
+                sinalFR TEXT,
+                sinalTEMP TEXT,
+                sinalSATO2 TEXT,
+                estadoGeral TEXT,
+                cardioResp TEXT,
+                neuroOutros TEXT,
+                hipotese TEXT,
+                conduta TEXT,
+                medicoCPF TEXT
+            )
+        ''')
+        conn.commit()
+
+# Inicializa o banco de dados no momento em que o Flask rodar
+init_db()
 
 @app.route('/')
 def index():
@@ -38,158 +109,174 @@ def serve_files(path):
 # ==============================================================
 @app.route('/api/usuarios', methods=['GET', 'POST', 'PUT'])
 def api_usuarios():
-    db = carregar_banco()
-    
-    if request.method == 'POST':
-        novo_usuario = request.json
-        # Evita duplicação por CPF
-        for u in db['usuarios']:
-            if u.get('cpf') == novo_usuario.get('cpf'):
+    with get_db() as conn:
+        c = conn.cursor()
+        
+        if request.method == 'POST':
+            d = request.json
+            cpf = d.get('cpf', '').replace('.', '').replace('-', '')
+            
+            c.execute("SELECT cpf FROM usuarios WHERE cpf=?", (cpf,))
+            if c.fetchone():
                 return jsonify({"msg": "Profissional já cadastrado com este CPF."}), 400
                 
-        db['usuarios'].append(novo_usuario)
-        salvar_banco(db)
-        return jsonify({"msg": "Cadastro realizado com sucesso!"}), 201
+            c.execute('''INSERT INTO usuarios (cpf, nome, email, senha, foto) 
+                         VALUES (?, ?, ?, ?, ?)''', 
+                      (cpf, d.get('nome'), d.get('email'), d.get('senha'), d.get('foto', '')))
+            conn.commit()
+            return jsonify({"msg": "Cadastro realizado com sucesso!"}), 201
 
-    if request.method == 'PUT':
-        dados = request.json
-        for i, u in enumerate(db['usuarios']):
-            if u.get('cpf') == dados.get('cpf'):
-                db['usuarios'][i].update(dados)
-                salvar_banco(db)
-                return jsonify({"msg": "Perfil atualizado!"})
-        return jsonify({"msg": "Usuário não encontrado"}), 404
+        if request.method == 'PUT':
+            d = request.json
+            cpf = d.get('cpf')
+            c.execute('''UPDATE usuarios SET nome=?, email=?, foto=? WHERE cpf=?''', 
+                      (d.get('nome'), d.get('email'), d.get('foto'), cpf))
+            conn.commit()
+            return jsonify({"msg": "Perfil atualizado!"})
 
-    # Retorna todos os profissionais para alimentar os dropdowns do painel
-    return jsonify(db['usuarios'])
+        # GET: Retorna os usuários para o Dropdown
+        c.execute("SELECT cpf, nome, email, foto FROM usuarios")
+        return jsonify([dict(row) for row in c.fetchall()])
 
 @app.route('/api/login', methods=['POST'])
 def api_login():
-    db = carregar_banco()
-    dados = request.json
-    cpf = dados.get('cpf', '').replace('.', '').replace('-', '')
-    senha = dados.get('senha', '')
+    d = request.json
+    cpf = d.get('cpf', '').replace('.', '').replace('-', '')
+    senha = d.get('senha', '')
 
-    for u in db['usuarios']:
-        u_cpf = u.get('cpf', '').replace('.', '').replace('-', '')
-        if u_cpf == cpf and u.get('senha') == senha:
-            return jsonify({"sucesso": True, "usuario": u})
-
-    return jsonify({"sucesso": False, "msg": "Usuário ou senha incorretos."}), 401
+    with get_db() as conn:
+        c = conn.cursor()
+        c.execute("SELECT * FROM usuarios WHERE cpf=? AND senha=?", (cpf, senha))
+        user = c.fetchone()
+        
+        if user:
+            return jsonify({"sucesso": True, "usuario": dict(user)})
+        return jsonify({"sucesso": False, "msg": "Usuário ou senha incorretos."}), 401
 
 # ==============================================================
 # API DE PACIENTES
 # ==============================================================
 @app.route('/api/pacientes', methods=['GET', 'POST', 'PUT'])
 def api_pacientes():
-    db = carregar_banco()
-    
-    if request.method == 'POST':
-        novo = request.json
-        novo['id'] = int(time.time() * 1000) 
-        db['pacientes'].insert(0, novo)
-        salvar_banco(db)
-        return jsonify({"msg": "Paciente cadastrado com sucesso"})
+    with get_db() as conn:
+        c = conn.cursor()
         
-    if request.method == 'PUT':
-        dados = request.json
-        for i, p in enumerate(db['pacientes']):
-            if p.get('id') == dados.get('id'):
-                db['pacientes'][i].update(dados)
-                salvar_banco(db)
-                break
-        return jsonify({"msg": "Dados do paciente atualizados"})
-        
-    return jsonify(db['pacientes'])
+        if request.method == 'POST':
+            d = request.json
+            c.execute('''INSERT INTO pacientes (nome, dataNasc, genero, idadeAnos, idadeMeses, idadeDias, documento, cartao)
+                         VALUES (?, ?, ?, ?, ?, ?, ?, ?)''',
+                      (d.get('nome'), d.get('dataNasc'), d.get('genero'), d.get('idadeAnos'), 
+                       d.get('idadeMeses'), d.get('idadeDias'), d.get('documento'), d.get('cartao')))
+            conn.commit()
+            return jsonify({"msg": "Paciente cadastrado com sucesso", "id": c.lastrowid})
+            
+        if request.method == 'PUT':
+            d = request.json
+            c.execute('''UPDATE pacientes SET nome=?, dataNasc=?, genero=?, idadeAnos=?, 
+                         idadeMeses=?, idadeDias=?, documento=?, cartao=? WHERE id=?''',
+                      (d.get('nome'), d.get('dataNasc'), d.get('genero'), d.get('idadeAnos'), 
+                       d.get('idadeMeses'), d.get('idadeDias'), d.get('documento'), d.get('cartao'), d.get('id')))
+            conn.commit()
+            return jsonify({"msg": "Dados do paciente atualizados"})
+            
+        c.execute("SELECT * FROM pacientes ORDER BY id DESC")
+        return jsonify([dict(row) for row in c.fetchall()])
 
 # ==============================================================
 # API DE CONSULTAS / AGENDAMENTOS
 # ==============================================================
 @app.route('/api/consultas', methods=['GET', 'POST', 'PUT'])
 def api_consultas():
-    db = carregar_banco()
-    status_type = request.args.get('status', 'ativas')
+    with get_db() as conn:
+        c = conn.cursor()
+        status_type = request.args.get('status', 'ativas')
 
-    if request.method == 'POST':
-        nova = request.json
+        if request.method == 'POST':
+            d = request.json
+            prof = d.get('profissional')
+            data_req = d.get('data')
+            hora_req = d.get('horario')
+            
+            # Validação: Impedir duplo agendamento para o mesmo profissional
+            c.execute("SELECT id FROM consultas WHERE profissional=? AND data=? AND horario=? AND status != 'Cancelado'", 
+                      (prof, data_req, hora_req))
+            if c.fetchone():
+                return jsonify({"error": f"O(a) profissional {prof} já possui um agendamento para {data_req} às {hora_req}."}), 400
+            
+            c.execute('''INSERT INTO consultas (pacienteId, nomePaciente, data, horario, profissional, status)
+                         VALUES (?, ?, ?, ?, ?, ?)''',
+                      (d.get('pacienteId'), d.get('nomePaciente'), data_req, hora_req, prof, d.get('status', 'Agendado')))
+            conn.commit()
+            return jsonify({"msg": "Consulta agendada com sucesso"})
+
+        if request.method == 'PUT':
+            d = request.json
+            c.execute("UPDATE consultas SET status=? WHERE id=?", (d.get('status'), d.get('id')))
+            conn.commit()
+            return jsonify({"msg": "Status da consulta atualizado"})
+
+        # GET: Listar e Filtrar Consultas
+        c.execute("SELECT * FROM consultas")
+        consultas = [dict(row) for row in c.fetchall()]
         
-        # ================================================================
-        # NOVA REGRA: EVITAR CONFLITO DE HORÁRIO PARA O MESMO MÉDICO
-        # ================================================================
-        data_solicitada = nova.get('data')
-        horario_solicitado = nova.get('horario')
-        profissional_solicitado = nova.get('profissional')
+        filtradas = []
+        for con in consultas:
+            if status_type == 'concluidas':
+                if con['status'] in ['Atendido', 'Cancelado']:
+                    filtradas.append(con)
+            else:
+                if con['status'] in ['Agendado', 'Confirmado']:
+                    filtradas.append(con)
 
-        for c in db['consultas']:
-            # Verifica se já existe uma consulta para este médico, neste mesmo dia e hora
-            # Ignora as consultas "Canceladas", pois estas libertam o horário
-            if (c.get('profissional') == profissional_solicitado and 
-                c.get('data') == data_solicitada and 
-                c.get('horario') == horario_solicitado and 
-                c.get('status') != 'Cancelado'):
-                
-                return jsonify({"error": f"O(a) profissional {profissional_solicitado} já tem um agendamento para {data_solicitada} às {horario_solicitado}."}), 400
-        # ================================================================
+        def sort_key(item):
+            try:
+                return datetime.strptime(f"{item['data']}T{item['horario']}", "%Y-%m-%dT%H:%M")
+            except:
+                return datetime.min
 
-        nova['id'] = int(time.time() * 1000)
-        if 'status' not in nova:
-            nova['status'] = 'Agendado'
-        db['consultas'].insert(0, nova)
-        salvar_banco(db)
-        return jsonify({"msg": "Consulta agendada com sucesso"})
-
-    if request.method == 'PUT':
-        dados = request.json
-        for i, c in enumerate(db['consultas']):
-            if c.get('id') == dados.get('id'):
-                db['consultas'][i].update(dados)
-                salvar_banco(db)
-                break
-        return jsonify({"msg": "Status da consulta atualizado"})
-
-    consultas_filtradas = []
-    for c in db['consultas']:
-        if status_type == 'concluidas':
-            if c.get('status') in ['Atendido', 'Cancelado']:
-                consultas_filtradas.append(c)
-        else:
-            if c.get('status') in ['Agendado', 'Confirmado']:
-                consultas_filtradas.append(c)
-
-    def sort_key(item):
-        try:
-            return datetime.strptime(f"{item.get('data')}T{item.get('horario')}", "%Y-%m-%dT%H:%M")
-        except:
-            return datetime.min
-
-    reverse_order = (status_type == 'concluidas')
-    consultas_filtradas.sort(key=sort_key, reverse=reverse_order)
-    return jsonify(consultas_filtradas)
+        filtradas.sort(key=sort_key, reverse=(status_type == 'concluidas'))
+        return jsonify(filtradas)
 
 # ==============================================================
 # API DE PRONTUÁRIOS (PEP)
 # ==============================================================
 @app.route('/api/prontuarios', methods=['GET', 'POST', 'PUT'])
 def api_prontuarios():
-    db = carregar_banco()
-    
-    if request.method == 'POST':
-        novo = request.json
-        novo['id'] = int(time.time() * 1000)
-        db['prontuarios'].insert(0, novo)
-        salvar_banco(db)
-        return jsonify({"msg": "Prontuário salvo com sucesso"})
+    with get_db() as conn:
+        c = conn.cursor()
         
-    if request.method == 'PUT':
-        dados = request.json
-        for i, p in enumerate(db['prontuarios']):
-            if p.get('id') == dados.get('id'):
-                db['prontuarios'][i].update(dados)
-                salvar_banco(db)
-                break
-        return jsonify({"msg": "Evolução clínica atualizada"})
+        if request.method == 'POST':
+            d = request.json
+            
+            # Lista exata das 30 colunas vindas do front-end
+            colunas = [
+                'pacienteId', 'nomePaciente', 'dataNascimento', 'genero', 
+                'idadeAnos', 'idadeMeses', 'idadeDias', 'documento', 
+                'convenioCartao', 'acompanhante', 'especialidade', 
+                'tipoAtendimento', 'prioridade', 'registroProfissional', 
+                'carimboAssinatura', 'qp', 'hda', 'hmp', 'alergias', 
+                'sinalPA', 'sinalFC', 'sinalFR', 'sinalTEMP', 'sinalSATO2', 
+                'estadoGeral', 'cardioResp', 'neuroOutros', 'hipotese', 
+                'conduta', 'medicoCPF'
+            ]
+            
+            placeholders = ', '.join(['?'] * len(colunas))
+            colunas_str = ', '.join(colunas)
+            valores = [d.get(coluna, '') for coluna in colunas]
+            
+            c.execute(f"INSERT INTO prontuarios ({colunas_str}) VALUES ({placeholders})", valores)
+            conn.commit()
+            return jsonify({"msg": "Prontuário salvo com sucesso"})
+            
+        if request.method == 'PUT':
+            d = request.json
+            c.execute("UPDATE prontuarios SET prioridade=?, conduta=? WHERE id=?", 
+                      (d.get('prioridade'), d.get('conduta'), d.get('id')))
+            conn.commit()
+            return jsonify({"msg": "Evolução clínica atualizada"})
 
-    return jsonify(db['prontuarios'])
+        c.execute("SELECT * FROM prontuarios ORDER BY id DESC")
+        return jsonify([dict(row) for row in c.fetchall()])
 
 if __name__ == '__main__':
     app.run(debug=True, port=5000)

@@ -74,7 +74,7 @@
             "data": "2026-07-03",
             "horario": "16:28",
             "profissional": "Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783106643174
         },
         {
@@ -83,7 +83,7 @@
             "data": "2026-07-03",
             "horario": "16:28",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783106628720
         },
         {
@@ -92,7 +92,7 @@
             "data": "2026-07-03",
             "horario": "16:15",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783105986843
         },
         {
@@ -101,7 +101,7 @@
             "data": "2026-07-03",
             "horario": "16:15",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783105863570
         },
         {
@@ -110,7 +110,7 @@
             "data": "2026-07-03",
             "horario": "16:15",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783105843258
         },
         {
@@ -119,7 +119,7 @@
             "data": "2026-07-03",
             "horario": "16:10",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783105788063
         },
         {
@@ -128,7 +128,7 @@
             "data": "2026-07-03",
             "horario": "16:11",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783105704041
         },
         {
@@ -137,7 +137,7 @@
             "data": "0011-01-01",
             "horario": "01:01",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783011714422
         },
         {
@@ -146,7 +146,7 @@
             "data": "0002-02-02",
             "horario": "02:02",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783011733174
         },
         {
@@ -155,7 +155,7 @@
             "data": "2026-07-02",
             "horario": "15:38",
             "profissional": "a",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783017442075
         },
         {
@@ -164,7 +164,7 @@
             "data": "2026-07-03",
             "horario": "15:49",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783104525467
         },
         {
@@ -173,7 +173,7 @@
             "data": "2026-07-03",
             "horario": "15:50",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783104569889
         },
         {
@@ -182,7 +182,7 @@
             "data": "2026-07-03",
             "horario": "15:50",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783104597483
         },
         {
@@ -191,7 +191,7 @@
             "data": "2026-07-03",
             "horario": "21:01",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783104769363
         },
         {
@@ -200,7 +200,7 @@
             "data": "2026-07-03",
             "horario": "15:57",
             "profissional": "Gabriel Alves Costa",
-            "status": "Agendado",
+            "status": "Atendido",
             "id": 1783104975702
         }
     ],

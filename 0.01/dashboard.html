@@ -373,13 +373,13 @@
                                     <select id="prontuarioPacienteSelect" class="form-select" required></select>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Acompanhante (Se houver)</label>
-                                    <input type="text" id="prontuarioAcompanhante" class="form-control">
-                                </div>
-                                <div class="col-md-4">
-                                    <label class="form-label fw-bold">Especialidade do Atendimento</label>
-                                    <input type="text" id="prontuarioEspecialidade" class="form-control" placeholder="Ex: Clínica Geral" required>
-                                </div>
+    <label class="form-label fw-bold">Acompanhante (Se houver)</label>
+    <input type="text" id="prontuarioAcompanhante" class="form-control" oninput="this.value = this.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '')">
+</div>
+<div class="col-md-4">
+    <label class="form-label fw-bold">Especialidade do Atendimento</label>
+    <input type="text" id="prontuarioEspecialidade" class="form-control" placeholder="Ex: Clínica Geral" required oninput="this.value = this.value.replace(/[^a-zA-ZÀ-ÿ\s]/g, '')">
+</div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Tipo de Atendimento</label>
                                     <select id="prontuarioTipoAtendimento" class="form-select">
@@ -460,14 +460,23 @@
                                     <textarea id="prontuarioConduta" class="form-control" rows="3" required></textarea>
                                 </div>
 
-                                <div class="col-12"><hr></div>
+                                <div class="col-12">
+                                    <hr>
+                                    <div class="d-flex justify-content-between align-items-center mb-2">
+                                        <h5 class="text-secondary mb-0">Assinatura e Autenticação</h5>
+                                        <button type="button" class="btn btn-outline-primary btn-sm fw-bold" onclick="preencherAssinaturaAutomatica()">
+                                            <i class="bi bi-magic"></i> Auto-preencher (Meu CPF e Foto)
+                                        </button>
+                                    </div>
+                                </div>
+                                
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Registro Profissional (CRM/COREN)</label>
-                                    <input type="text" id="prontuarioRegistroProfissional" class="form-control" placeholder="Ex: CRM/AL 12345" required>
+                                    <label class="form-label fw-bold">Registro Profissional (CRM/COREN/CPF)</label>
+                                    <input type="text" id="prontuarioRegistroProfissional" class="form-control" required readonly>
                                 </div>
                                 <div class="col-md-6">
-                                    <label class="form-label fw-bold">Carimbo Digitalizado / Assinatura (Opcional)</label>
-                                    <input type="file" id="prontuarioCarimbo" class="form-control" accept="image/*" onchange="previewCarimbo(this)">
+                                    <label class="form-label fw-bold">Carimbo Digitalizado / Assinatura</label>
+                                    <input type="file" id="prontuarioCarimbo" class="form-control" accept="image/*" onchange="previewCarimbo(this)" style="pointer-events: none; opacity: 0;">
                                     <div class="mt-2">
                                         <img id="prontuarioCarimboPreview" src="" class="d-none img-thumbnail border shadow-sm" style="max-height: 80px;">
                                     </div>

@@ -337,7 +337,7 @@ function obterClasseStatusConsulta(status) {
     return 'bg-primary text-white';
 }
 
-// === MURAL GERAL DE CONSULTAS ===
+// === EXIBIÇÃO: MURAL GERAL DE CONSULTAS ===
 async function renderizarTabelaConsultas() {
     const tabela = document.getElementById('tabelaConsultas');
     if (!tabela) return;
@@ -544,6 +544,43 @@ async function alterarStatusConsulta(id, novoStatus) {
 // ====================================================================
 // REQUISITOS DA API EM PYTHON - PRONTUÁRIOS (PEP)
 // ====================================================================
+
+// === NOVA FUNÇÃO MÁGICA: AUTOPREENCHER ASSINATURA ===
+function preencherAssinaturaAutomatica() {
+    const cpfLogado = localStorage.getItem('loggedInUserCPF');
+    if (!cpfLogado) return alert("Erro: Sessão do profissional não encontrada.");
+
+    const dados = localStorage.getItem(cpfLogado);
+    if (dados) {
+        try {
+            const user = JSON.parse(dados);
+            
+            // 1. Preenche o CRM/COREN/CPF com o identificador do usuário
+            const registroInput = document.getElementById('prontuarioRegistroProfissional');
+            if (registroInput) {
+                registroInput.value = user.cpf || cpfLogado;
+            }
+
+            // 2. Verifica a imagem de perfil
+            const avatarPadrao = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
+            // Puxa do localStorage ou puxa da imagem visual no topo da tela do Perfil
+            const foto = user.foto || document.getElementById('perfilFoto').src;
+
+            if (foto && foto !== avatarPadrao && foto !== "") {
+                const preview = document.getElementById('prontuarioCarimboPreview');
+                if (preview) {
+                    preview.src = foto;
+                    preview.classList.remove('d-none');
+                }
+            } else {
+                alert("Aviso: Você está usando o avatar padrão. O seu número identificador (CPF) foi preenchido com sucesso, mas para gerar uma assinatura visual, recomendamos cadastrar uma foto de carimbo ou rubrica na aba 'Meu Perfil'.");
+            }
+        } catch(e) {
+            console.error("Erro ao tentar puxar dados do perfil para assinar", e);
+        }
+    }
+}
+
 async function publicarProntuario(event) {
     event.preventDefault();
 
@@ -557,7 +594,8 @@ async function publicarProntuario(event) {
         if (!pacienteSelecionado) return alert("Erro ao identificar o paciente.");
 
         const carimboImg = document.getElementById('prontuarioCarimboPreview').src;
-        const carimboSalvar = carimboImg.startsWith('data:image') ? carimboImg : '';
+        // Permite envio de assinaturas automáticas (fotos) ou base64
+        const carimboSalvar = (carimboImg.startsWith('data:image') || carimboImg.startsWith('http')) ? carimboImg : '';
 
         const novoProntuario = {
             pacienteId: pacienteSelecionado.id,
@@ -784,7 +822,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     document.getElementById('tab-consultas-agendadas')?.addEventListener('shown.bs.tab', renderizarTabelaConsultas);
     document.getElementById('tab-consultas-concluidas')?.addEventListener('shown.bs.tab', renderizarTabelaConsultasConcluidas);
     
-    // Atualiza os dropdowns ao abrir as abas "Agendar Nova Consulta" e "Novo Prontuário"
+    // Atualiza os dropdowns ao abrir a aba "Agendar Nova Consulta" e "Novo Prontuário"
     document.getElementById('tab-novo-prontuario')?.addEventListener('shown.bs.tab', atualizarDropdownPacientes);
     document.getElementById('tab-nova-consulta')?.addEventListener('shown.bs.tab', async () => {
         await atualizarDropdownPacientes();
