@@ -1,4 +1,5 @@
 from database.fake_db import Database
+from werkzeug.security import generate_password_hash, check_password_hash
 
 
 class Usuario:
@@ -12,13 +13,14 @@ class Usuario:
 
     def salvar(self):
         db = Database()
+        hashed_senha = generate_password_hash(self.senha)
         with db.conectar() as conexao:
             conexao.execute(
                 """
                 INSERT INTO usuarios (nome, email, cargo, crm_coren, senha, admin)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (self.nome, self.email, self.cargo, self.crm_coren, self.senha, self.admin),
+                (self.nome, self.email, self.cargo, self.crm_coren, hashed_senha, self.admin),
             )
 
     @staticmethod
@@ -66,9 +68,13 @@ class Usuario:
         with db.conectar() as conexao:
             cursor = conexao.execute(
                 """
-                SELECT * FROM usuarios WHERE (email = ? OR crm_coren = ?) AND senha = ?
+                SELECT * FROM usuarios WHERE email = ? OR crm_coren = ?
                 """,
-                (login_id, login_id, senha),
+                (login_id, login_id),
             )
-            return cursor.fetchone()
+            usuario = cursor.fetchone()
+
+        if usuario and check_password_hash(usuario[5], senha):
+            return usuario
+        return None
         

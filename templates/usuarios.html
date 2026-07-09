@@ -17,7 +17,6 @@
                         <th>ID</th>
                         <th>Nome</th>
                         <th>E-mail</th>
-                        <th>Senha</th>
                         <th>Cargo</th>
                         <th>CRM/COREM</th>
                         <th>Administrador</th>
@@ -30,7 +29,6 @@
                         <td>{{ usuario.id }}</td>
                         <td>{{ usuario.nome }}</td>
                         <td>{{ usuario.email }}</td>
-                        <td>{{ usuario.senha or '-' }}</td>
                         <td>{{ usuario.cargo }}</td>
                         <td>{{ usuario.crm_coren or '-' }}</td>
                         <td>{{ 'Sim' if usuario.admin == 'sim' else 'Não' }}</td>
@@ -41,7 +39,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="8">Nenhum usuário cadastrado.</td>
+                        <td colspan="7">Nenhum usuário cadastrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

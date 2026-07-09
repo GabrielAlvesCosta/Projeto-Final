@@ -58,6 +58,31 @@ def test_cadastro_com_dados_validos_cria_usuario(client):
     assert usuario == 1
 
 
+def test_cadastro_armazenando_senha_com_hash(client):
+    client.post(
+        "/cadastro",
+        data={
+            "nome": "Maria",
+            "email": "maria@email.com",
+            "cargo": "Enfermeira",
+            "crm_coren": "CR123",
+            "senha": "123456",
+            "admin": "nao",
+        },
+        follow_redirects=False,
+    )
+
+    db = fake_db_module.Database()
+    with db.conectar() as conexao:
+        senha_armazenada = conexao.execute(
+            "SELECT senha FROM usuarios WHERE email = ?",
+            ("maria@email.com",),
+        ).fetchone()[0]
+
+    assert senha_armazenada != "123456"
+    assert "$" in senha_armazenada
+
+
 def test_cadastro_com_campos_vazios_exibe_erro(client):
     response = client.post(
         "/cadastro",

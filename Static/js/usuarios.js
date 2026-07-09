@@ -16,7 +16,7 @@ function carregarUsuarios() {
     if (usuarios.length === 0) {
         lista.innerHTML = `
             <tr>
-                <td colspan="8">Nenhum usuário cadastrado.</td>
+                <td colspan="7">Nenhum usuário cadastrado.</td>
             </tr>
         `;
         return;
@@ -29,7 +29,6 @@ function carregarUsuarios() {
             <td>${usuario.id}</td>
             <td>${usuario.nome}</td>
             <td>${usuario.email}</td>
-            <td>${usuario.senha || "-"}</td>
             <td>${usuario.cargo}</td>
             <td>${usuario.crm_corem || "-"}</td>
             <td>${usuario.admin === "sim" ? "Sim" : "Não"}</td>
@@ -55,7 +54,7 @@ function abrirModal(id) {
         document.getElementById("editId").value = usuario.id;
         document.getElementById("editNome").value = usuario.nome;
         document.getElementById("editEmail").value = usuario.email;
-        document.getElementById("editSenha").value = usuario.senha || "";
+        document.getElementById("editSenha").value = "";
         document.getElementById("editCargo").value = usuario.cargo;
         document.getElementById("editCrmCorem").value = usuario.crm_corem || "";
         
@@ -95,7 +94,6 @@ formEditar.addEventListener("submit", function (e) {
     const id = parseInt(document.getElementById("editId").value);
     const nome = document.getElementById("editNome").value.trim();
     const email = document.getElementById("editEmail").value.trim();
-    const senha = document.getElementById("editSenha").value;
     const cargo = document.getElementById("editCargo").value.trim();
     const crm_corem = document.getElementById("editCrmCorem").value.trim();
     const admin = document.querySelector("input[name='editAdmin']:checked").value;
@@ -109,7 +107,7 @@ formEditar.addEventListener("submit", function (e) {
 
     usuarios = usuarios.map((usuario) => {
         if (usuario.id === id) {
-            return { id, nome, email, senha, cargo, crm_corem, admin };
+            return { id, nome, email, cargo, crm_corem, admin };
         }
         return usuario;
     });

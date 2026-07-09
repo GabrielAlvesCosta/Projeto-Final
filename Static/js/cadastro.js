@@ -31,6 +31,30 @@ function validarSenha() {
 senhaInput.addEventListener("input", validarSenha);
 confirmarInput.addEventListener("input", validarSenha);
 
+const togglePasswordButtons = document.querySelectorAll(".toggle-password");
+togglePasswordButtons.forEach((button) => {
+    button.addEventListener("click", (event) => {
+        event.preventDefault();
+        const targetId = button.dataset.target;
+        const input = document.getElementById(targetId);
+        if (!input) return;
+
+        const isPassword = input.type === "password";
+        input.type = isPassword ? "text" : "password";
+        const icon = button.querySelector("i");
+        if (icon) {
+            if (isPassword) {
+                icon.classList.remove("fa-eye");
+                icon.classList.add("fa-eye-slash");
+            } else {
+                icon.classList.remove("fa-eye-slash");
+                icon.classList.add("fa-eye");
+            }
+        }
+        button.setAttribute("aria-label", isPassword ? "Ocultar senha" : "Mostrar senha");
+    });
+});
+
 form.addEventListener("submit", (e) => {
     const nome = document.getElementById("nome").value.trim();
     const email = document.getElementById("email").value.trim();
