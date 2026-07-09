@@ -14,13 +14,14 @@ class Usuario:
     def salvar(self):
         db = Database()
         hashed_senha = generate_password_hash(self.senha)
+        hashed_crm_coren = generate_password_hash(self.crm_coren)
         with db.conectar() as conexao:
             conexao.execute(
                 """
                 INSERT INTO usuarios (nome, email, cargo, crm_coren, senha, admin)
                 VALUES (?, ?, ?, ?, ?, ?)
                 """,
-                (self.nome, self.email, self.cargo, self.crm_coren, hashed_senha, self.admin),
+                (self.nome, self.email, self.cargo, hashed_crm_coren, hashed_senha, self.admin),
             )
 
     @staticmethod
@@ -41,11 +42,13 @@ class Usuario:
         with db.conectar() as conexao:
             cursor = conexao.execute(
                 """
-                SELECT * FROM usuarios WHERE crm_coren = ?
-                """,
-                (crm_coren,),
+                SELECT * FROM usuarios
+                """
             )
-            return cursor.fetchone()
+            for usuario in cursor.fetchall():
+                if check_password_hash(usuario[4], crm_coren):
+                    return usuario
+        return None
 
     @staticmethod
     def listar_todos():
@@ -68,13 +71,23 @@ class Usuario:
         with db.conectar() as conexao:
             cursor = conexao.execute(
                 """
-                SELECT * FROM usuarios WHERE email = ? OR crm_coren = ?
+                SELECT * FROM usuarios WHERE email = ?
                 """,
-                (login_id, login_id),
+                (login_id,),
             )
             usuario = cursor.fetchone()
 
-        if usuario and check_password_hash(usuario[5], senha):
-            return usuario
+            if usuario and check_password_hash(usuario[5], senha):
+                return usuario
+
+            cursor = conexao.execute(
+                """
+                SELECT * FROM usuarios
+                """
+            )
+            for usuario in cursor.fetchall():
+                if check_password_hash(usuario[4], login_id) and check_password_hash(usuario[5], senha):
+                    return usuario
+
         return None
         

@@ -112,7 +112,6 @@ class AuthController:
                 "nome": usuario[1],
                 "email": usuario[2],
                 "cargo": usuario[3],
-                "crm_coren": usuario[4],
                 "admin": usuario[6] if len(usuario) > 6 else "nao",
             }
             for usuario in usuarios

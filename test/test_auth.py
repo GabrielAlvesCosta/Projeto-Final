@@ -83,6 +83,55 @@ def test_cadastro_armazenando_senha_com_hash(client):
     assert "$" in senha_armazenada
 
 
+def test_crm_coren_armazenado_com_hash(client):
+    client.post(
+        "/cadastro",
+        data={
+            "nome": "Paula",
+            "email": "paula@email.com",
+            "cargo": "Técnica",
+            "crm_coren": "COREM999",
+            "senha": "senha456",
+            "admin": "nao",
+        },
+        follow_redirects=False,
+    )
+
+    db = fake_db_module.Database()
+    with db.conectar() as conexao:
+        crm_armazenado = conexao.execute(
+            "SELECT crm_coren FROM usuarios WHERE email = ?",
+            ("paula@email.com",),
+        ).fetchone()[0]
+
+    assert crm_armazenado != "COREM999"
+    assert "$" in crm_armazenado
+
+
+def test_login_com_crm_redireciona_para_teste(client):
+    client.post(
+        "/cadastro",
+        data={
+            "nome": "Lucas",
+            "email": "lucas@email.com",
+            "cargo": "Médico",
+            "crm_coren": "CRM1234",
+            "senha": "senha789",
+            "admin": "nao",
+        },
+        follow_redirects=False,
+    )
+
+    response = client.post(
+        "/login",
+        data={"email": "CRM1234", "senha": "senha789"},
+        follow_redirects=False,
+    )
+
+    assert response.status_code == 302
+    assert response.headers["Location"].endswith("/teste")
+
+
 def test_cadastro_com_campos_vazios_exibe_erro(client):
     response = client.post(
         "/cadastro",

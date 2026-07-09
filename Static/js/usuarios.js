@@ -16,7 +16,7 @@ function carregarUsuarios() {
     if (usuarios.length === 0) {
         lista.innerHTML = `
             <tr>
-                <td colspan="7">Nenhum usuário cadastrado.</td>
+                <td colspan="6">Nenhum usuário cadastrado.</td>
             </tr>
         `;
         return;
@@ -30,7 +30,6 @@ function carregarUsuarios() {
             <td>${usuario.nome}</td>
             <td>${usuario.email}</td>
             <td>${usuario.cargo}</td>
-            <td>${usuario.crm_corem || "-"}</td>
             <td>${usuario.admin === "sim" ? "Sim" : "Não"}</td>
             <td>
                 <button class="btn-editar" onclick="abrirModal(${usuario.id})">

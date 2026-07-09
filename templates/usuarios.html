@@ -18,7 +18,6 @@
                         <th>Nome</th>
                         <th>E-mail</th>
                         <th>Cargo</th>
-                        <th>CRM/COREM</th>
                         <th>Administrador</th>
                         <th>Ações</th>
                     </tr>
@@ -30,7 +29,6 @@
                         <td>{{ usuario.nome }}</td>
                         <td>{{ usuario.email }}</td>
                         <td>{{ usuario.cargo }}</td>
-                        <td>{{ usuario.crm_coren or '-' }}</td>
                         <td>{{ 'Sim' if usuario.admin == 'sim' else 'Não' }}</td>
                         <td>
                             <button class="btn-editar" onclick="abrirModal({{ usuario.id }})">Editar</button>
@@ -39,7 +37,7 @@
                     </tr>
                     {% else %}
                     <tr>
-                        <td colspan="7">Nenhum usuário cadastrado.</td>
+                        <td colspan="6">Nenhum usuário cadastrado.</td>
                     </tr>
                     {% endfor %}
                 </tbody>
