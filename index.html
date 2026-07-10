@@ -23,7 +23,7 @@ background:#f4f6f9;
 .sidebar{
 width:250px;
 height:100vh;
-background:#1e3a5f;
+background:#024d04;
 color:white;
 padding:20px;
 position:fixed;
@@ -39,14 +39,14 @@ width:100%;
 padding:12px;
 margin-bottom:10px;
 border:none;
-background:#2e5a8a;
+background: #049909;
 color:white;
 cursor:pointer;
 border-radius:5px;
 }
 
 .sidebar button:hover{
-background:#3d73af;
+background:#9cec88;
 }
 
 .main{
@@ -96,6 +96,20 @@ border-radius:5px;
 cursor:pointer;
 }
 
+button.visualizar{
+background:#2f1e5f;
+color:white;
+border:none;
+padding:6px 12px;
+border-radius:4px;
+cursor:pointer;
+margin-right: 5px;
+}
+
+button.visualizar:hover{
+background:#453085;
+}
+
 button.excluir{
 background:#dc3545;
 color:white;
@@ -116,7 +130,7 @@ background:white;
 }
 
 th{
-background:#1e3a5f;
+background:#2f1e5f;
 color:white;
 padding:12px;
 text-align:left;
@@ -132,6 +146,52 @@ text-align:center;
 color:#777;
 padding:20px;
 font-style:italic;
+}
+
+/* --- ESTILOS DO POPUP (MODAL) --- */
+.modal {
+display:none; 
+position:fixed; 
+z-index:2000; 
+left:0;
+top:0;
+width:100%; 
+height:100%; 
+background-color:rgba(0,0,0,0.5); 
+}
+
+.modal-conteudo {
+background-color:#fff;
+margin:10% auto; 
+padding:25px;
+border-radius:8px;
+width:50%; 
+max-width:600px;
+box-shadow:0 4px 15px rgba(0,0,0,0.2);
+}
+
+.fechar {
+color:#aaa;
+float:right;
+font-size:28px;
+font-weight:bold;
+cursor:pointer;
+line-height: 20px;
+}
+
+.fechar:hover {
+color:black;
+}
+
+.modal-conteudo h2 {
+margin-bottom: 15px;
+color: #2f1e5f;
+}
+
+.modal-conteudo p {
+margin-bottom: 12px;
+font-size: 16px;
+line-height: 1.5;
 }
 
 </style>
@@ -272,27 +332,61 @@ font-style:italic;
 
 <div id="prontuario" class="page">
 
-<div class="card">
+    <div class="card">
 
-<h2>Prontuário Eletrônico</h2>
+        <h2>Prontuário Eletrônico</h2>
 
-<label>Selecione o Paciente</label>
-<select id="prontuario-paciente" onchange="carregarProntuarioExistente()">
-    <option value="">-- Selecione um Paciente --</option>
-</select>
+        <label>Selecione o Paciente</label>
+        <select id="prontuario-paciente" onchange="carregarProntuarioExistente()">
+            <option value="">-- Selecione um Paciente --</option>
+        </select>
 
-<label>Diagnóstico</label>
-<textarea id="prontuario-diagnostico" rows="5" placeholder="Digite a evolução clínica do paciente..."></textarea>
+        <label>Diagnóstico</label>
+        <textarea id="prontuario-diagnostico" rows="5"
+        placeholder="Digite a evolução clínica do paciente..."></textarea>
 
-<label>Medicamentos / Prescrição</label>
-<textarea id="prontuario-medicamentos" rows="3" placeholder="Medicamentos receitados..."></textarea>
+        <label>Medicamentos / Prescrição</label>
+        <textarea id="prontuario-medicamentos" rows="3"
+        placeholder="Medicamentos receitados..."></textarea>
 
-<button class="salvar" onclick="salvarProntuario()">Salvar Prontuário</button>
+        <button class="salvar" onclick="salvarProntuario()">
+            Salvar Prontuário
+        </button>
+
+        <hr><br>
+
+        <h3>Prontuários Salvos</h3>
+
+        <table class="tabela-prontuario">
+
+            <thead>
+                <tr>
+                    <th>Paciente</th>
+                    <th>Diagnóstico</th>
+                    <th>Ações</th>
+                </tr>
+            </thead>
+
+            <tbody id="listaProntuarios">
+            </tbody>
+
+        </table>
+
+    </div>
 
 </div>
 
 </div>
 
+<div id="popupProntuario" class="modal">
+    <div class="modal-conteudo">
+        <span class="fechar" onclick="fecharPopup()">&times;</span>
+        <h2>Detalhes do Prontuário</h2>
+        <hr><br>
+        <p><strong>Paciente:</strong> <span id="popPaciente"></span></p>
+        <p><strong>Diagnóstico:</strong> <span id="popDiagnostico"></span></p>
+        <p><strong>Medicamentos / Prescrição:</strong> <span id="popMedicamentos"></span></p>
+    </div>
 </div>
 
 <script>
@@ -305,13 +399,14 @@ function mostrar(id){
     });
     document.getElementById(id).classList.add('active');
     
-    // Se a aba aberta for a de prontuário, atualiza a lista de pacientes do select
+    // Se a aba aberta for a de prontuário, atualiza a lista e a tabela de prontuários
     if(id === 'prontuario') {
         atualizarSelectPacientes();
+        desenharTabelaProntuarios();
     }
 }
 
-// Salvar perfil do Administrador
+// Salvar perfil do Administrator
 function salvarPerfil(){
     let senha = document.getElementById("senha").value;
     let confirmar = document.getElementById("confirmarSenha").value;
@@ -393,7 +488,7 @@ function excluirPaciente(index) {
     if(confirm("Tem certeza que deseja remover este paciente?")) {
         let listaPacientes = JSON.parse(localStorage.getItem("listaPacientes")) || [];
         
-        // Remove também o prontuário vinculado ao CPF do paciente deletado
+        
         let cpfRemovido = listaPacientes[index].cpf;
         localStorage.removeItem("prontuario_" + cpfRemovido);
 
@@ -401,18 +496,17 @@ function excluirPaciente(index) {
         localStorage.setItem("listaPacientes", JSON.stringify(listaPacientes));
         
         desenharTabela();
+        desenharTabelaProntuarios();
     }
 }
 
 
-// === NOVO: LÓGICA DO PRONTUÁRIO ELETRÔNICO ===
+// === 
 
-// Preenche o menu <select> com os pacientes reais cadastrados
 function atualizarSelectPacientes() {
     let listaPacientes = JSON.parse(localStorage.getItem("listaPacientes")) || [];
     let select = document.getElementById("prontuario-paciente");
     
-    // Mantém apenas a primeira opção padrão
     select.innerHTML = '<option value="">-- Selecione um Paciente --</option>';
 
     listaPacientes.forEach(paciente => {
@@ -420,12 +514,10 @@ function atualizarSelectPacientes() {
         select.innerHTML += opcao;
     });
 
-    // Limpa os campos de texto do prontuário ao recarregar a lista
     document.getElementById("prontuario-diagnostico").value = "";
     document.getElementById("prontuario-medicamentos").value = "";
 }
 
-// Carrega automaticamente o prontuário caso o paciente já tenha um histórico salvo
 function carregarProntuarioExistente() {
     let cpfPaciente = document.getElementById("prontuario-paciente").value;
     
@@ -435,22 +527,22 @@ function carregarProntuarioExistente() {
         return;
     }
 
-    // Procura por um prontuário usando o CPF como chave única
     let prontuarioSalvo = JSON.parse(localStorage.getItem("prontuario_" + cpfPaciente));
 
     if(prontuarioSalvo) {
         document.getElementById("prontuario-diagnostico").value = prontuarioSalvo.diagnostico;
         document.getElementById("prontuario-medicamentos").value = prontuarioSalvo.medicamentos;
     } else {
-        // Se for a primeira vez do paciente, limpa para criação de uma folha em branco
         document.getElementById("prontuario-diagnostico").value = "";
         document.getElementById("prontuario-medicamentos").value = "";
     }
 }
 
-// Salva o prontuário atrelado ao CPF selecionado
 function salvarProntuario() {
-    let cpfPaciente = document.getElementById("prontuario-paciente").value;
+    let selectPaciente = document.getElementById("prontuario-paciente");
+    let cpfPaciente = selectPaciente.value;
+    let nomePaciente = selectPaciente.options[selectPaciente.selectedIndex].text.split(' (CPF:')[0];
+    
     let diagnostico = document.getElementById("prontuario-diagnostico").value.trim();
     let medicamentos = document.getElementById("prontuario-medicamentos").value.trim();
 
@@ -465,16 +557,85 @@ function salvarProntuario() {
     }
 
     let dadosProntuario = {
+        nome: nomePaciente,
+        cpf: cpfPaciente,
         diagnostico: diagnostico,
         medicamentos: medicamentos
     };
 
-    // Salva no localStorage identificando pelo CPF do paciente específico
     localStorage.setItem("prontuario_" + cpfPaciente, JSON.stringify(dadosProntuario));
     
     alert("Prontuário armazenado e atualizado com sucesso!");
+    desenharTabelaProntuarios();
 }
 
+
+function desenharTabelaProntuarios() {
+    let corpoTabelaProntuarios = document.getElementById("listaProntuarios");
+    corpoTabelaProntuarios.innerHTML = "";
+
+    let listaPacientes = JSON.parse(localStorage.getItem("listaPacientes")) || [];
+    let possuiProntuario = false;
+
+    listaPacientes.forEach(paciente => {
+        let prontuario = JSON.parse(localStorage.getItem("prontuario_" + paciente.cpf));
+        
+        if(prontuario) {
+            possuiProntuario = true;
+           
+            let diagnosticoResumido = prontuario.diagnostico.length > 50 ? prontuario.diagnostico.substring(0, 50) + "..." : prontuario.diagnostico;
+
+            let linha = `
+                <tr>
+                    <td>${paciente.nome}</td>
+                    <td>${diagnosticoResumido}</td>
+                    <td>
+                        <button class="visualizar" onclick="abrirPopup('${paciente.nome}', \`${prontuario.diagnostico.replace(/`/g, '\\`').replace(/\n/g, '<br>')}\`, \`${prontuario.medicamentos.replace(/`/g, '\\`').replace(/\n/g, '<br>')}\`)">Visualizar</button>
+                        <button class="excluir" onclick="deletarProntuarioEspecifico('${paciente.cpf}')">Excluir</button>
+                    </td>
+                </tr>
+            `;
+            corpoTabelaProntuarios.innerHTML += linha;
+        }
+    });
+
+    if(!possuiProntuario) {
+        corpoTabelaProntuarios.innerHTML = `<tr><td colspan="3" class="sem-dados">Nenhum prontuário salvo até o momento.</td></tr>`;
+    }
+}
+
+
+function abrirPopup(nome, diagnostico, medicamentos) {
+    document.getElementById("popPaciente").innerText = nome;
+    document.getElementById("popDiagnostico").innerHTML = diagnostico;
+    document.getElementById("popMedicamentos").innerHTML = medicamentos || "Nenhum medicamento receitado.";
+    
+    document.getElementById("popupProntuario").style.display = "block";
+}
+
+function fecharPopup() {
+    document.getElementById("popupProntuario").style.display = "none";
+}
+
+function deletarProntuarioEspecifico(cpf) {
+    if(confirm("Deseja realmente excluir as informações clínicas e prescrições deste prontuário?")) {
+        localStorage.removeItem("prontuario_" + cpf);
+        desenharTabelaProntuarios();
+        // Limpa os campos de digitação caso o mesmo paciente esteja selecionado no momento
+        if(document.getElementById("prontuario-paciente").value === cpf) {
+            document.getElementById("prontuario-diagnostico").value = "";
+            document.getElementById("prontuario-medicamentos").value = "";
+        }
+    }
+}
+
+
+window.onclick = function(event) {
+    let modal = document.getElementById("popupProntuario");
+    if (event.target == modal) {
+        modal.style.display = "none";
+    }
+}
 
 // Inicialização
 window.onload = function(){
@@ -487,5 +648,6 @@ window.onload = function(){
 }
 
 </script>
+
 </body>
 </html>
