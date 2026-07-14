@@ -256,14 +256,14 @@
                                 <div class="col-md-3">
                                     <label class="form-label fw-bold">Idade (Anos / Meses / Dias)</label>
                                     <div class="input-group">
-                                        <input type="number" id="pacienteIdadeAnos" class="form-control" placeholder="Anos">
-                                        <input type="number" id="pacienteIdadeMeses" class="form-control" placeholder="Meses">
-                                        <input type="number" id="pacienteIdadeDias" class="form-control" placeholder="Dias">
+                                        <input type="number" id="pacienteIdadeAnos" class="form-control" placeholder="Anos" required>
+                                        <input type="number" id="pacienteIdadeMeses" class="form-control" placeholder="Meses" required>
+                                        <input type="number" id="pacienteIdadeDias" class="form-control" placeholder="Dias" required>
                                     </div>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label fw-bold">Documento (CPF/RG)</label>
-                                    <input type="text" id="pacienteDocumento" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Apenas números">
+                                    <input type="text" id="pacienteDocumento" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Apenas números" required>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label fw-bold">Cartão SUS / Convênio</label>
@@ -271,7 +271,7 @@
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label fw-bold text-success">Número para Contato</label>
-                                    <input type="text" id="pacienteContato" class="form-control border-success" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Ex: DDD + Número">
+                                    <input type="text" id="pacienteContato" class="form-control border-success" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" placeholder="Ex: DDD + Número" required>
                                 </div>
                                 <div class="col-12 mt-4">
                                     <button type="submit" class="btn btn-success"><i class="bi bi-check-circle"></i> Cadastrar Paciente</button>
@@ -385,11 +385,11 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Acompanhante (Se houver)</label>
-                                    <input type="text" id="prontuarioAcompanhante" class="form-control">
+                                    <input type="text" id="prontuarioAcompanhante" class="form-control" oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')" placeholder="Nome do acompanhante...">
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Especialidade do Atendimento</label>
-                                    <input type="text" id="prontuarioEspecialidade" class="form-control" placeholder="Ex: Clínica Geral" required>
+                                    <input type="text" id="prontuarioEspecialidade" class="form-control" placeholder="Ex: Clínica Geral" oninput="this.value = this.value.replace(/[^A-Za-zÀ-ÿ\s]/g, '')"required>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label fw-bold">Tipo de Atendimento</label>
@@ -411,23 +411,23 @@
                                 <div class="col-12"><hr><h5 class="text-secondary">Sinais Vitais (Triagem)</h5></div>
                                 <div class="col-md-2">
                                     <label class="form-label small fw-bold">P.A. (mmHg)</label>
-                                    <input type="text" id="prontuarioPA" class="form-control" oninput="this.value = this.value.replace(/[^0-9/]/g, '')" placeholder="120/80">
+                                    <input type="text" id="prontuarioPA" class="form-control" oninput="this.value = this.value.replace(/[^0-9/]/g, '')" placeholder="120/80" required>
                                 </div>
                                 <div class="col-md-2">
                                     <label class="form-label small fw-bold">F.C. (bpm)</label>
-                                    <input type="text" id="prontuarioFC" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                    <input type="text" id="prontuarioFC" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
                                 </div>
                                 <div class="col-md-2">
                                     <label class="form-label small fw-bold">F.R. (rpm)</label>
-                                    <input type="text" id="prontuarioFR" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                    <input type="text" id="prontuarioFR" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label small fw-bold">Temp. Corporal (°C)</label>
-                                    <input type="text" id="prontuarioTEMP" class="form-control" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" placeholder="Ex: 36.5">
+                                    <input type="text" id="prontuarioTEMP" class="form-control" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" placeholder="Ex: 36.5" required>
                                 </div>
                                 <div class="col-md-3">
                                     <label class="form-label small fw-bold">SatO₂ (%)</label>
-                                    <input type="text" id="prontuarioSATO2" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')">
+                                    <input type="text" id="prontuarioSATO2" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
                                 </div>
 
                                 <div class="col-12"><hr><h5 class="text-secondary">Anamnese e Exame Clínico</h5></div>
@@ -441,16 +441,16 @@
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Histórico Médico Pregresso (HMP)</label>
-                                    <textarea id="prontuarioHMP" class="form-control" rows="2"></textarea>
+                                    <textarea id="prontuarioHMP" class="form-control" rows="2" required></textarea>
                                 </div>
                                 <div class="col-md-6">
                                     <label class="form-label fw-bold">Alergias Conhecidas</label>
-                                    <textarea id="prontuarioAlergias" class="form-control" rows="2" placeholder="Nega alergias..."></textarea>
+                                    <textarea id="prontuarioAlergias" class="form-control" rows="2" placeholder="Nega alergias..." required></textarea>
                                 </div>
 
                                 <div class="col-md-4">
                                     <label class="form-label small fw-bold">Estado Geral</label>
-                                    <textarea id="prontuarioEstadoGeral" class="form-control" rows="2"></textarea>
+                                    <textarea id="prontuarioEstadoGeral" class="form-control" rows="2" required></textarea>
                                 </div>
                                 <div class="col-md-4">
                                     <label class="form-label small fw-bold">Exame Cardiorrespiratório</label>
