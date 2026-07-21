@@ -74,8 +74,7 @@ def init_db():
             CREATE TABLE IF NOT EXISTS prontuarios (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pacienteId INTEGER, nomePaciente TEXT, dataNascimento TEXT, genero TEXT,
-                idadeAnos TEXT, idadeMeses TEXT, idadeDias TEXT, documento TEXT,
-                convenioCartao TEXT, contatoPaciente TEXT, acompanhante TEXT,
+                documento TEXT, convenioCartao TEXT, contatoPaciente TEXT, acompanhante TEXT,
                 especialidade TEXT, tipoAtendimento TEXT, prioridade TEXT,
                 registroProfissional TEXT, carimboAssinatura TEXT, qp TEXT, hda TEXT, hmp TEXT, alergias TEXT,
                 sinalPA TEXT, sinalFC TEXT, sinalFR TEXT, sinalTEMP TEXT, sinalSATO2 TEXT,

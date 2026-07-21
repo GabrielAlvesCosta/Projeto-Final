@@ -1,18 +1,12 @@
-(function() {
-    // Validação imediata: se a variável window.usuarioLogado não existir,
-    // significa que o utilizador fugiu da sessão do Flask.
-    if (!window.usuarioLogado || !window.usuarioLogado.id) {
-        window.location.replace('/login');
-    }
-})();
-
-// Onde você buscava o nome do médico, agora é instantâneo:
+// ====================================================================
+// AUXILIARES DE SESSÃO E IDENTIFICAÇÃO DO PROFISSIONAL
+// ====================================================================
 function obterNomeProfissionalLogado() {
-    return window.usuarioLogado.nome;
+    return window.usuarioLogado ? window.usuarioLogado.nome : '';
 }
 
 function obterCRMCORENProfissionalLogado() {
-    return window.usuarioLogado.crm_coren;
+    return window.usuarioLogado ? window.usuarioLogado.crm_coren : '';
 }
 
 // ====================================================================
@@ -20,44 +14,31 @@ function obterCRMCORENProfissionalLogado() {
 // ====================================================================
 function previewCarimbo(input) {
     const preview = document.getElementById('prontuarioCarimboPreview');
-    if (input.files && input.files[0]) {
+    if (preview && input.files && input.files[0]) {
         const reader = new FileReader();
         reader.onload = function(e) {
             preview.src = e.target.result;
             preview.classList.remove('d-none');
-        }
+        };
         reader.readAsDataURL(input.files[0]);
-    } else {
+    } else if (preview) {
         preview.src = "";
         preview.classList.add('d-none');
     }
 }
 
 function previewFoto(input) {
-    if (input.files && input.files[0]) {
+    const perfilFoto = document.getElementById('perfilFoto');
+    if (perfilFoto && input.files && input.files[0]) {
         const reader = new FileReader();
-        reader.onload = function(e) { document.getElementById('perfilFoto').src = e.target.result; }
+        reader.onload = function(e) { perfilFoto.src = e.target.result; };
         reader.readAsDataURL(input.files[0]);
     }
 }
 
 // ====================================================================
-// PERFIL DO PROFISSIONAL E CONECTIVIDADE LOCAL
+// PERFIL DO PROFISSIONAL
 // ====================================================================
-function obterNomeProfissionalLogado() {
-    const cpfLogado = localStorage.getItem('loggedInUserCPF');
-    if (cpfLogado) {
-        const dados = localStorage.getItem(cpfLogado);
-        if (dados) {
-            try {
-                const user = JSON.parse(dados);
-                if (user && user.nome) return user.nome;
-            } catch(e){}
-        }
-    }
-    return "";
-}
-
 function carregarDadosPerfil() {
     const cpfLogado = localStorage.getItem('loggedInUserCPF');
     if (cpfLogado) {
@@ -71,7 +52,9 @@ function carregarDadosPerfil() {
                 if (document.getElementById('perfilEmail')) document.getElementById('perfilEmail').value = user.email || '';
                 if (document.getElementById('perfilCPF')) document.getElementById('perfilCPF').value = user.cpf || '';
                 if (document.getElementById('perfilFoto') && user.foto) document.getElementById('perfilFoto').src = user.foto;
-            } catch(e){}
+            } catch(e) {
+                console.error("Erro ao carregar dados do perfil:", e);
+            }
         }
     }
 }
@@ -82,11 +65,13 @@ async function salvarPerfil() {
 
     let user = {};
     const dados = localStorage.getItem(cpfLogado);
-    if (dados) { try { user = JSON.parse(dados); } catch(e){} }
+    if (dados) { 
+        try { user = JSON.parse(dados); } catch(e){} 
+    }
 
-    user.nome = document.getElementById('perfilNome').value;
-    user.email = document.getElementById('perfilEmail').value;
-    user.foto = document.getElementById('perfilFoto').src;
+    user.nome = document.getElementById('perfilNome')?.value || '';
+    user.email = document.getElementById('perfilEmail')?.value || '';
+    user.foto = document.getElementById('perfilFoto')?.src || '';
 
     localStorage.setItem(cpfLogado, JSON.stringify(user));
     
@@ -96,7 +81,9 @@ async function salvarPerfil() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(user)
         });
-    } catch(e) {}
+    } catch(e) {
+        console.error("Erro ao salvar perfil no servidor:", e);
+    }
 
     carregarDadosPerfil();
     await atualizarDropdownProfissionais();
@@ -107,7 +94,7 @@ async function salvarPerfil() {
 }
 
 // ====================================================================
-// DROPDOWNS (SELECTS) DINÂMICOS
+// DROPDOWNS DINÂMICOS
 // ====================================================================
 async function atualizarDropdownPacientes() {
     const selectProntuario = document.getElementById('prontuarioPacienteSelect');
@@ -120,11 +107,13 @@ async function atualizarDropdownPacientes() {
         const pacientes = await res.json();
         
         const optionsHTML = '<option value="">Selecione um paciente cadastrado...</option>' + 
-            pacientes.map(p => `<option value="${p.id}">${p.nome} (Doc: ${p.documento || 'S/N'})</option>`).join('');
+            pacientes.map(p => `<option value="${p.id}">${p.nome || 'Sem Nome'} (Doc: ${p.documento || 'S/N'})</option>`).join('');
 
         if (selectProntuario) selectProntuario.innerHTML = optionsHTML;
         if (selectConsulta) selectConsulta.innerHTML = optionsHTML;
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao atualizar dropdown de pacientes:", e);
+    }
 }
 
 async function atualizarDropdownProfissionais() {
@@ -144,28 +133,49 @@ async function atualizarDropdownProfissionais() {
             }).join('');
 
         selectProfissional.innerHTML = optionsHTML;
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao atualizar dropdown de profissionais:", e);
+    }
 }
 
 // ====================================================================
-// PACIENTES
+// GESTÃO DE PACIENTES
 // ====================================================================
 async function cadastrarPaciente(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
+
+    // TRAVA DE SEGURANÇA: Evita duplo clique
+    const btnSubmit = document.querySelector('#formNovoPaciente button[type="submit"]');
+    if (btnSubmit) {
+        if (btnSubmit.disabled) return; // Se já está salvando, interrompe
+        btnSubmit.disabled = true;
+        btnSubmit.dataset.texto = btnSubmit.innerHTML;
+        btnSubmit.innerHTML = 'Salvando...';
+    }
 
     const radioGenero = document.querySelector('input[name="pacienteGenero"]:checked');
     const generoSelecionado = radioGenero ? radioGenero.value : "Não informado";
+    const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : '';
+
+    const dataNascVal = getVal('pacienteDataNasc');
+    const hojeData = new Date().toISOString().split('T')[0];
+    
+    // VALIDAÇÃO: Impede data de nascimento no futuro
+    if (dataNascVal > hojeData) {
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = btnSubmit.dataset.texto;
+        }
+        return alert("A data de nascimento não pode ser no futuro!");
+    }
 
     const novoPaciente = {
-        nome: document.getElementById('pacienteNome').value,
-        dataNasc: document.getElementById('pacienteDataNasc').value,
+        nome: getVal('pacienteNome'),
+        dataNasc: dataNascVal,
         genero: generoSelecionado,
-        idadeAnos: document.getElementById('pacienteIdadeAnos').value,
-        idadeMeses: document.getElementById('pacienteIdadeMeses').value,
-        idadeDias: document.getElementById('pacienteIdadeDias').value,
-        documento: document.getElementById('pacienteDocumento').value,
-        cartao: document.getElementById('pacienteCartao').value,
-        contato: document.getElementById('pacienteContato').value
+        documento: getVal('pacienteDocumento'),
+        cartao: getVal('pacienteCartao'),
+        contato: getVal('pacienteContato')
     };
 
     try {
@@ -174,15 +184,32 @@ async function cadastrarPaciente(event) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(novoPaciente)
         });
+
         if (res.ok) {
             alert("Paciente cadastrado com sucesso!");
-            document.getElementById('formNovoPaciente').reset();
+            const form = document.getElementById('formNovoPaciente');
+            if (form) form.reset();
+            
             await atualizarDropdownPacientes();
             await renderizarTabelaPacientes();
+
             const tab = document.getElementById('tab-pacientes-cadastrados');
-            if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+            if (tab && typeof bootstrap !== 'undefined') {
+                bootstrap.Tab.getOrCreateInstance(tab).show();
+            }
+        } else {
+            alert("Falha ao salvar paciente no servidor.");
         }
-    } catch(e) { alert("Erro ao cadastrar o paciente."); }
+    } catch(e) { 
+        console.error("Erro ao cadastrar paciente:", e);
+        alert("Erro ao cadastrar o paciente."); 
+    } finally {
+        // Libera o botão independente de sucesso ou erro
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = btnSubmit.dataset.texto;
+        }
+    }
 }
 
 async function renderizarTabelaPacientes() {
@@ -191,7 +218,8 @@ async function renderizarTabelaPacientes() {
 
     try {
         const res = await fetch('/api/pacientes');
-        if (!res.ok) return;
+        if (!res.ok) throw new Error(`Status do servidor: ${res.status}`);
+        
         const pacientes = await res.json();
         const inputBusca = document.getElementById('buscaPacienteLista');
         const termoBusca = inputBusca ? inputBusca.value.toLowerCase().trim() : '';
@@ -208,11 +236,11 @@ async function renderizarTabelaPacientes() {
         filtrados.forEach(p => {
             tabela.insertAdjacentHTML('beforeend', `
                 <tr>
-                    <td><strong class="text-dark">${p.nome}</strong></td>
+                    <td><strong class="text-dark">${p.nome || 'Sem Nome'}</strong></td>
                     <td>${formatarDataBR(p.dataNasc)} / <span class="text-muted">${p.genero || 'N/I'}</span></td>
                     <td>${p.documento || 'Não informado'}</td>
-                    <td>${p.cartao}</td>
-                    <td>${p.contato || 'N/I'}</td>
+                    <td>${p.cartao || 'Não informado'}</td>
+                    <td>${p.contato || 'Não informado'}</td>
                     <td class="text-end text-nowrap">
                         <button class="btn btn-sm btn-outline-primary" onclick="abrirEdicaoPaciente(${p.id})">
                             <i class="bi bi-pencil-square"></i> Editar
@@ -221,44 +249,56 @@ async function renderizarTabelaPacientes() {
                 </tr>
             `);
         });
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao renderizar tabela de pacientes:", e);
+    }
 }
 
 async function abrirEdicaoPaciente(id) {
     try {
         const res = await fetch('/api/pacientes');
         const pacientes = await res.json();
-        const paciente = pacientes.find(p => p.id === id);
+        const paciente = pacientes.find(p => p.id == id);
         if (!paciente) return alert("Paciente não localizado.");
 
-        document.getElementById('editPacienteId').value = paciente.id;
-        document.getElementById('editPacienteNome').value = paciente.nome;
-        document.getElementById('editPacienteDataNasc').value = paciente.dataNasc;
-        document.getElementById('editPacienteGenero').value = paciente.genero || 'Masculino';
-        document.getElementById('editPacienteIdadeAnos').value = paciente.idadeAnos || '';
-        document.getElementById('editPacienteIdadeMeses').value = paciente.idadeMeses || '';
-        document.getElementById('editPacienteIdadeDias').value = paciente.idadeDias || '';
-        document.getElementById('editPacienteDocumento').value = paciente.documento || '';
-        document.getElementById('editPacienteCartao').value = paciente.cartao || '';
-        document.getElementById('editPacienteContato').value = paciente.contato || '';
+        const setVal = (id, val) => { if (document.getElementById(id)) document.getElementById(id).value = val || ''; };
 
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarPaciente')).show();
-    } catch(e){}
+        setVal('editPacienteId', paciente.id);
+        setVal('editPacienteNome', paciente.nome);
+        setVal('editPacienteDataNasc', paciente.dataNasc);
+        setVal('editPacienteGenero', paciente.genero || 'Masculino');
+        setVal('editPacienteDocumento', paciente.documento);
+        setVal('editPacienteCartao', paciente.cartao);
+        setVal('editPacienteContato', paciente.contato);
+
+        const modalEl = document.getElementById('modalEditarPaciente');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    } catch(e) {
+        console.error("Erro ao abrir edição de paciente:", e);
+    }
 }
 
 async function salvarEdicaoPaciente() {
-    const id = parseInt(document.getElementById('editPacienteId').value);
+    const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : '';
+
+    const id = parseInt(getVal('editPacienteId'));
+    const dataNascVal = getVal('editPacienteDataNasc');
+    const hojeData = new Date().toISOString().split('T')[0];
+
+    if (dataNascVal > hojeData) {
+        return alert("A data de nascimento não pode ser no futuro!");
+    }
+
     const pacienteAtualizado = {
         id: id,
-        nome: document.getElementById('editPacienteNome').value,
-        dataNasc: document.getElementById('editPacienteDataNasc').value,
-        genero: document.getElementById('editPacienteGenero').value,
-        idadeAnos: document.getElementById('editPacienteIdadeAnos').value,
-        idadeMeses: document.getElementById('editPacienteIdadeMeses').value,
-        idadeDias: document.getElementById('editPacienteIdadeDias').value,
-        documento: document.getElementById('editPacienteDocumento').value,
-        cartao: document.getElementById('editPacienteCartao').value,
-        contato: document.getElementById('editPacienteContato').value
+        nome: getVal('editPacienteNome'),
+        dataNasc: dataNascVal,
+        genero: getVal('editPacienteGenero'),
+        documento: getVal('editPacienteDocumento'),
+        cartao: getVal('editPacienteCartao'),
+        contato: getVal('editPacienteContato')
     };
 
     try {
@@ -270,52 +310,62 @@ async function salvarEdicaoPaciente() {
         if (res.ok) {
             await atualizarDropdownPacientes();
             await renderizarTabelaPacientes();
-            bootstrap.Modal.getInstance(document.getElementById('modalEditarPaciente')).hide();
+            const modalEl = document.getElementById('modalEditarPaciente');
+            if (modalEl) bootstrap.Modal.getInstance(modalEl)?.hide();
             alert("Dados cadastrais do paciente atualizados!");
         }
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao salvar edição de paciente:", e);
+    }
 }
 
 // ====================================================================
-// CONSULTAS
+// GESTÃO DE CONSULTAS
 // ====================================================================
 async function agendarConsulta(event) {
-    event.preventDefault();
-
-    const pacienteId = parseInt(document.getElementById('consultaPacienteSelect').value);
-    if (!pacienteId) return alert("Por favor, selecione um paciente.");
-
-    const dataInput = document.getElementById('consultaData').value;
-    const horarioInput = document.getElementById('consultaHorario').value;
-    const profissionalInput = document.getElementById('consultaProfissional').value;
-
-    if (!dataInput || !horarioInput) {
-        return alert("Por favor, selecione a data e o horário da consulta.");
-    }
-    if (!profissionalInput) {
-        return alert("Por favor, selecione o médico / especialista responsável.");
-    }
-
-    const dataHoraConsulta = new Date(`${dataInput}T${horarioInput}`);
-    const agora = new Date();
-
-    if (dataHoraConsulta < agora) {
-        return alert("Erro crítico: Não é possível agendar uma consulta para uma data ou horário que já passou!");
-    }
-
-    const selectPac = document.getElementById('consultaPacienteSelect');
-    const nomePaciente = selectPac.options[selectPac.selectedIndex].text.split(' (Doc:')[0];
-
-    const novaConsulta = {
-        pacienteId: pacienteId,
-        nomePaciente: nomePaciente,
-        data: dataInput,
-        horario: horarioInput,
-        profissional: profissionalInput,
-        status: 'Agendado'
-    };
+    if (event) event.preventDefault();
 
     try {
+        const pacienteId = parseInt(document.getElementById('consultaPacienteSelect')?.value);
+        if (!pacienteId) return alert("Por favor, selecione um paciente.");
+
+        const dataInput = document.getElementById('consultaData')?.value;
+        const horarioInput = document.getElementById('consultaHorario')?.value;
+        const profissionalInput = document.getElementById('consultaProfissional')?.value;
+
+        if (!dataInput || !horarioInput) return alert("Por favor, selecione a data e o horário da consulta.");
+        if (!profissionalInput) return alert("Por favor, selecione o médico / especialista responsável.");
+
+        const dataHoraConsulta = new Date(`${dataInput}T${horarioInput}`);
+        const agora = new Date();
+
+        if (dataHoraConsulta < agora) {
+            return alert("Erro crítico: Não é possível agendar uma consulta para uma data ou horário que já passou!");
+        }
+
+        // TRAVA DE SEGURANÇA: Evita duplo clique
+        const btnSubmit = document.querySelector('#formNovaConsulta button[type="submit"]');
+        if (btnSubmit) {
+            if (btnSubmit.disabled) return;
+            btnSubmit.disabled = true;
+            btnSubmit.dataset.texto = btnSubmit.innerHTML;
+            btnSubmit.innerHTML = 'Agendando...';
+        }
+
+        const selectPac = document.getElementById('consultaPacienteSelect');
+        const nomePaciente = selectPac.options[selectPac.selectedIndex].text.split(' (Doc:')[0];
+
+        const novaConsulta = {
+            pacienteId: pacienteId,
+            nomePaciente: nomePaciente,
+            data: dataInput,
+            horario: horarioInput,
+            profissional: profissionalInput,
+            status: 'Agendado'
+        };
+
+        console.log("Tentando enviar os seguintes dados para o servidor:", novaConsulta);
+
         const response = await fetch('/api/consultas', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -324,11 +374,19 @@ async function agendarConsulta(event) {
 
         if (!response.ok) {
             const errData = await response.json();
-            return alert(errData.error || "Erro ao agendar consulta.");
+            console.error("Resposta de erro do servidor:", errData);
+            
+            // Libera o botão se houver erro
+            if (btnSubmit) {
+                btnSubmit.disabled = false;
+                btnSubmit.innerHTML = btnSubmit.dataset.texto;
+            }
+            return alert(errData.error || `Erro ao agendar consulta. Status do Servidor: ${response.status}`);
         }
 
         alert("Consulta agendada com sucesso!");
-        document.getElementById('formNovaConsulta').reset();
+        const form = document.getElementById('formNovaConsulta');
+        if (form) form.reset();
         
         await renderizarTabelaConsultas();
         await renderizarTabelaConsultasConcluidas();
@@ -337,9 +395,25 @@ async function agendarConsulta(event) {
         await atualizarPainelAtendimentos();
 
         const tab = document.getElementById('tab-consultas-agendadas');
-        if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+        if (tab && typeof bootstrap !== 'undefined') {
+            bootstrap.Tab.getOrCreateInstance(tab).show();
+        }
+
+        // Restaura o botão após o sucesso
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = btnSubmit.dataset.texto;
+        }
+
     } catch (error) {
-        alert("Erro de comunicação com o servidor.");
+        console.error("Erro crítico e inesperado ao agendar consulta:", error);
+        alert("Ocorreu uma falha no sistema. Por favor, verifique o Console (F12) para mais detalhes.");
+        
+        const btnSubmit = document.querySelector('#formNovaConsulta button[type="submit"]');
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = btnSubmit.dataset.texto;
+        }
     }
 }
 
@@ -392,7 +466,9 @@ async function renderizarTabelaConsultas() {
                 </tr>
             `);
         });
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao renderizar tabela de consultas:", e);
+    }
 }
 
 async function renderizarTabelaConsultasConcluidas() {
@@ -433,7 +509,9 @@ async function renderizarTabelaConsultasConcluidas() {
                 </tr>
             `);
         });
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao renderizar consultas concluídas:", e);
+    }
 }
 
 async function renderizarMinhasConsultas() {
@@ -472,7 +550,9 @@ async function renderizarMinhasConsultas() {
                 </tr>
             `);
         });
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao renderizar minhas consultas:", e);
+    }
 }
 
 async function renderizarMinhasConsultasConcluidas() {
@@ -507,7 +587,9 @@ async function renderizarMinhasConsultasConcluidas() {
                 </tr>
             `);
         });
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao renderizar minhas consultas concluídas:", e);
+    }
 }
 
 async function atualizarPainelAtendimentos() {
@@ -531,7 +613,9 @@ async function atualizarPainelAtendimentos() {
         if (document.getElementById('count-consultas-ativas')) document.getElementById('count-consultas-ativas').textContent = ativasDoProfissional.length;
         if (document.getElementById('count-consultas-concluidas')) document.getElementById('count-consultas-concluidas').textContent = concluidasDoProfissional.length;
         if (document.getElementById('count-prontuarios')) document.getElementById('count-prontuarios').textContent = prontuariosDoProfissional.length;
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao atualizar painel:", e);
+    }
 }
 
 async function alterarStatusConsulta(id, novoStatus) {
@@ -548,19 +632,35 @@ async function alterarStatusConsulta(id, novoStatus) {
             await renderizarMinhasConsultasConcluidas();
             await atualizarPainelAtendimentos();
         }
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao alterar status da consulta:", e);
+    }
 }
 
 // ====================================================================
-// PRONTUÁRIOS (PEP) E AUDITORIA
+// PRONTUÁRIOS (PEP) E AUDITORIA (CORRIGIDO E UNIFICADO)
 // ====================================================================
 async function publicarProntuario(event) {
-    event.preventDefault();
+    if (event) event.preventDefault();
 
-    const pacienteId = parseInt(document.getElementById('prontuarioPacienteSelect').value);
-    if (!pacienteId) return alert("Selecione o paciente.");
+    const selectPaciente = document.getElementById('prontuarioPacienteSelect');
+    const pacienteId = selectPaciente ? selectPaciente.value : '';
+    
+    if (!pacienteId) {
+        alert("Por favor, selecione um paciente para registrar o prontuário.");
+        return;
+    }
 
-    const cpfLogado = localStorage.getItem('loggedInUserCPF');
+    // TRAVA DE SEGURANÇA: Evita duplo clique
+    const btnSubmit = document.querySelector('#formNovoProntuario button[type="submit"]');
+    if (btnSubmit) {
+        if (btnSubmit.disabled) return;
+        btnSubmit.disabled = true;
+        btnSubmit.dataset.texto = btnSubmit.innerHTML;
+        btnSubmit.innerHTML = 'Publicando...';
+    }
+
+    const cpfLogado = localStorage.getItem('loggedInUserCPF') || (window.usuarioLogado ? window.usuarioLogado.cpf : '');
     let registroAutenticado = cpfLogado;
     let carimboAutenticado = '';
     const avatarPadrao = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
@@ -583,39 +683,47 @@ async function publicarProntuario(event) {
     }
 
     try {
+        // Busca a lista atualizada de pacientes
         const pRes = await fetch('/api/pacientes');
+        if (!pRes.ok) throw new Error("Não foi possível validar o paciente no servidor.");
+        
         const pacientes = await pRes.json();
-        const paciente = pacientes.find(p => p.id === pacienteId);
+        // Uso de == (igualdade flexível) para evitar erros entre string e number
+        const paciente = pacientes.find(p => p.id == pacienteId);
+
+        if (!paciente) {
+            alert("Erro: O paciente selecionado não foi encontrado na base de dados.");
+            return;
+        }
+
+        const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : '';
 
         const novoProntuario = {
             pacienteId: paciente.id,
             nomePaciente: paciente.nome,
             dataNascimento: paciente.dataNasc,
             genero: paciente.genero,
-            idadeAnos: paciente.idadeAnos,
-            idadeMeses: paciente.idadeMeses,
-            idadeDias: paciente.idadeDias,
             documento: paciente.documento,
             convenioCartao: paciente.cartao,
-            contatoPaciente: paciente.contato || paciente.telefone || paciente.celular || 'Não cadastrado', 
-            acompanhante: document.getElementById('prontuarioAcompanhante').value,
-            especialidade: document.getElementById('prontuarioEspecialidade').value,
-            tipoAtendimento: document.getElementById('prontuarioTipoAtendimento').value,
-            prioridade: document.getElementById('prontuarioPrioridade').value,
-            qp: document.getElementById('prontuarioQP').value,
-            hda: document.getElementById('prontuarioHDA').value,
-            hmp: document.getElementById('prontuarioHMP').value,
-            alergias: document.getElementById('prontuarioAlergias').value,
-            sinalPA: document.getElementById('prontuarioPA').value,
-            sinalFC: document.getElementById('prontuarioFC').value,
-            sinalFR: document.getElementById('prontuarioFR').value,
-            sinalTEMP: document.getElementById('prontuarioTEMP').value,
-            sinalSATO2: document.getElementById('prontuarioSATO2').value,
-            estadoGeral: document.getElementById('prontuarioEstadoGeral').value,
-            cardioResp: document.getElementById('prontuarioCardioResp').value,
-            neuroOutros: document.getElementById('prontuarioNeuroOutros').value,
-            hipotese: document.getElementById('prontuarioHipotese').value,
-            conduta: document.getElementById('prontuarioConduta').value,
+            contatoPaciente: paciente.contato || 'Não cadastrado', 
+            acompanhante: getVal('prontuarioAcompanhante'),
+            especialidade: getVal('prontuarioEspecialidade'),
+            tipoAtendimento: getVal('prontuarioTipoAtendimento'),
+            prioridade: getVal('prontuarioPrioridade'),
+            qp: getVal('prontuarioQP'),
+            hda: getVal('prontuarioHDA'),
+            hmp: getVal('prontuarioHMP'),
+            alergias: getVal('prontuarioAlergias'),
+            sinalPA: getVal('prontuarioPA'),
+            sinalFC: getVal('prontuarioFC'),
+            sinalFR: getVal('prontuarioFR'),
+            sinalTEMP: getVal('prontuarioTEMP'),
+            sinalSATO2: getVal('prontuarioSATO2'),
+            estadoGeral: getVal('prontuarioEstadoGeral'),
+            cardioResp: getVal('prontuarioCardioResp'),
+            neuroOutros: getVal('prontuarioNeuroOutros'),
+            hipotese: getVal('prontuarioHipotese'),
+            conduta: getVal('prontuarioConduta'),
             medicoCPF: cpfLogado || 'anonimo',
             registroProfissional: registroAutenticado,
             carimboAssinatura: carimboAutenticado
@@ -628,15 +736,33 @@ async function publicarProntuario(event) {
         });
 
         if (res.ok) {
-            alert("Prontuário clínico aberto e autenticado digitalmente!");
-            document.getElementById('formNovoProntuario').reset();
+            alert("✅ Prontuário e registro de auditoria gravados com sucesso!");
+            
+            const form = document.getElementById('formNovoProntuario');
+            if (form) form.reset();
+            
             await renderizarTabelaProntuarios();
             await atualizarPainelAtendimentos();
             await renderizarTabelaAuditoria(); 
+            
             const tab = document.getElementById('tab-historico-prontuarios');
-            if (tab) bootstrap.Tab.getOrCreateInstance(tab).show();
+            if (tab && typeof bootstrap !== 'undefined') {
+                bootstrap.Tab.getOrCreateInstance(tab).show();
+            }
+        } else {
+            const errData = await res.json().catch(() => ({}));
+            alert("❌ Erro ao salvar no banco de dados: " + (errData.error || `Código ${res.status}`));
         }
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro na rotina de publicação do prontuário:", e);
+        alert("❌ Ocorreu uma falha na requisição: " + e.message);
+    } finally {
+        // Libera o botão independente de sucesso ou erro
+        if (btnSubmit) {
+            btnSubmit.disabled = false;
+            btnSubmit.innerHTML = btnSubmit.dataset.texto;
+        }
+    }
 }
 
 async function renderizarTabelaProntuarios() {
@@ -670,14 +796,14 @@ async function renderizarTabelaProntuarios() {
                         <div class="d-flex align-items-center gap-3">
                             <img src="${imgCarimbo}" class="rounded-circle object-fit-cover shadow-sm bg-white" style="width: 50px; height: 50px; border: 1px solid #dee2e6;">
                             <div>
-                                <h6 class="mb-1 fw-bold text-dark">${p.nomePaciente}</h6>
-                                <div class="text-muted small">${p.tipoAtendimento} > ${p.convenioCartao || 'S/N'}</div>
+                                <h6 class="mb-1 fw-bold text-dark">${p.nomePaciente || 'Paciente Sem Nome'}</h6>
+                                <div class="text-muted small">${p.tipoAtendimento || 'Consulta'} > ${p.convenioCartao || 'S/N'}</div>
                             </div>
                         </div>
                     </td>
                     <td>
-                        <span class="badge bg-secondary mb-1">${p.especialidade}</span><br>
-                        <span class="badge ${cl}">${p.prioridade}</span>
+                        <span class="badge bg-secondary mb-1">${p.especialidade || 'Geral'}</span><br>
+                        <span class="badge ${cl}">${p.prioridade || 'Normal'}</span>
                     </td>
                     <td class="text-dark small">
                         <strong>Nasc:</strong> ${formatarDataBR(p.dataNascimento)}<br>
@@ -692,68 +818,76 @@ async function renderizarTabelaProntuarios() {
                 </tr>
             `);
         });
-    } catch(e){}
+    } catch(e) {
+        console.error("Erro ao renderizar tabela de prontuários:", e);
+    }
 }
 
 async function abrirEdicaoProntuario(id) {
     try {
         const res = await fetch('/api/prontuarios');
         const prontuarios = await res.json();
-        const prontuario = prontuarios.find(p => p.id === id);
+        const prontuario = prontuarios.find(p => p.id == id);
         if (!prontuario) return alert("Prontuário não localizado.");
 
-        // DISPARO SILENCIOSO DO LOG DE VISUALIZAÇÃO
         const cpfLogado = localStorage.getItem('loggedInUserCPF');
         if (cpfLogado) {
             fetch('/api/prontuarios/auditoria', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prontuario_id: id, usuario_cpf: cpfLogado, acao: 'Visualização' })
-            }).catch(e => console.error("Falha ao registrar auditoria.", e));
+                body: JSON.stringify({ prontuario_id: id, usuario_cpf: cpfLogado, acao: 'Visualização', nome_paciente: prontuario.nomePaciente })
+            }).catch(e => console.error("Falha ao registrar auditoria de visualização:", e));
         }
 
-        document.getElementById('editProntuarioNome').textContent = prontuario.nomePaciente || 'Não informado';
-        document.getElementById('editProntuarioNasc').textContent = formatarDataBR(prontuario.dataNascimento);
-        document.getElementById('editProntuarioGenero').textContent = prontuario.genero || 'Não informado';
-        document.getElementById('editProntuarioCartao').textContent = prontuario.convenioCartao || 'Não informado';
-        document.getElementById('editProntuarioContato').textContent = prontuario.contatoPaciente || 'Não informado';
+        const setTxt = (id, val) => { if (document.getElementById(id)) document.getElementById(id).textContent = val || 'Não informado'; };
+        const setVal = (id, val) => { if (document.getElementById(id)) document.getElementById(id).value = val || ''; };
 
-        document.getElementById('editProntuarioQP').value = prontuario.qp || '';
-        document.getElementById('editProntuarioHDA').value = prontuario.hda || '';
-        document.getElementById('editProntuarioHMP').value = prontuario.hmp || '';
-        document.getElementById('editProntuarioAlergias').value = prontuario.alergias || '';
+        setTxt('editProntuarioNome', prontuario.nomePaciente);
+        setTxt('editProntuarioNasc', formatarDataBR(prontuario.dataNascimento));
+        setTxt('editProntuarioGenero', prontuario.genero);
+        setTxt('editProntuarioCartao', prontuario.convenioCartao);
+        setTxt('editProntuarioContato', prontuario.contatoPaciente);
 
-        document.getElementById('editProntuarioPA').value = prontuario.sinalPA || '';
-        document.getElementById('editProntuarioFC').value = prontuario.sinalFC || '';
-        document.getElementById('editProntuarioFR').value = prontuario.sinalFR || '';
-        document.getElementById('editProntuarioTEMP').value = prontuario.sinalTEMP || '';
-        document.getElementById('editProntuarioSATO2').value = prontuario.sinalSATO2 || '';
-        document.getElementById('editProntuarioEstadoGeral').value = prontuario.estadoGeral || '';
-        document.getElementById('editProntuarioCardio').value = prontuario.cardioResp || '';
-        document.getElementById('editProntuarioNeuro').value = prontuario.neuroOutros || '';
+        setVal('editProntuarioQP', prontuario.qp);
+        setVal('editProntuarioHDA', prontuario.hda);
+        setVal('editProntuarioHMP', prontuario.hmp);
+        setVal('editProntuarioAlergias', prontuario.alergias);
 
-        document.getElementById('editProntuarioHD').value = prontuario.hipotese || '';
-        document.getElementById('editProntuarioConduta').value = prontuario.conduta || '';
-        document.getElementById('editProntuarioPrioridade').value = prontuario.prioridade || 'Normal';
-        document.getElementById('editProntuarioRegistro').textContent = prontuario.registroProfissional || 'Não informado';
+        setVal('editProntuarioPA', prontuario.sinalPA);
+        setVal('editProntuarioFC', prontuario.sinalFC);
+        setVal('editProntuarioFR', prontuario.sinalFR);
+        setVal('editProntuarioTEMP', prontuario.sinalTEMP);
+        setVal('editProntuarioSATO2', prontuario.sinalSATO2);
+        setVal('editProntuarioEstadoGeral', prontuario.estadoGeral);
+        setVal('editProntuarioCardio', prontuario.cardioResp);
+        setVal('editProntuarioNeuro', prontuario.neuroOutros);
+
+        setVal('editProntuarioHD', prontuario.hipotese);
+        setVal('editProntuarioConduta', prontuario.conduta);
+        setVal('editProntuarioPrioridade', prontuario.prioridade || 'Normal');
+        setTxt('editProntuarioRegistro', prontuario.registroProfissional);
 
         const imgCarimbo = document.getElementById('editProntuarioCarimboView');
         const wrapper = document.getElementById('wrapperCarimboVisualizar');
-        if (prontuario.carimboAssinatura) {
-            imgCarimbo.src = prontuario.carimboAssinatura;
-            wrapper.classList.remove('d-none');
-        } else {
-            imgCarimbo.src = "";
-            wrapper.classList.add('d-none');
+        if (imgCarimbo && wrapper) {
+            if (prontuario.carimboAssinatura) {
+                imgCarimbo.src = prontuario.carimboAssinatura;
+                wrapper.classList.remove('d-none');
+            } else {
+                imgCarimbo.src = "";
+                wrapper.classList.add('d-none');
+            }
         }
 
-        bootstrap.Modal.getOrCreateInstance(document.getElementById('modalEditarProntuario')).show();
-    } catch(e){}
+        const modalEl = document.getElementById('modalEditarProntuario');
+        if (modalEl && typeof bootstrap !== 'undefined') {
+            bootstrap.Modal.getOrCreateInstance(modalEl).show();
+        }
+    } catch(e) {
+        console.error("Erro ao abrir prontuário:", e);
+    }
 }
 
-// ====================================================================
-// RENDERIZAÇÃO DA TABELA DE AUDITORIA
-// ====================================================================
 async function renderizarTabelaAuditoria() {
     const tabela = document.getElementById('tabelaAuditoria');
     if (!tabela) return;
@@ -777,17 +911,22 @@ async function renderizarTabelaAuditoria() {
                     <td class="fw-bold text-secondary">${l.data_hora}</td>
                     <td>
                         <strong>${l.nome_profissional || 'Desconhecido'}</strong><br>
-                        <small class="text-muted">CPF: ${l.usuario_cpf}</small>
+                        <small class="text-muted">CPF/ID: ${l.usuario_cpf}</small>
                     </td>
                     <td><span class="badge ${badgeClass}">${l.acao}</span></td>
-                    <td class="text-primary fw-bold">#${l.prontuario_id}</td>
+                    <td class="text-primary fw-bold">#${l.prontuario_id || 'N/A'}</td>
                     <td>${l.nome_paciente || 'Paciente Apagado/Inativo'}</td>
                 </tr>
             `);
         });
-    } catch(e) {}
+    } catch(e) {
+        console.error("Erro ao renderizar auditoria:", e);
+    }
 }
 
+// ====================================================================
+// FUNÇÕES AUXILIARES DE FORMATAÇÃO
+// ====================================================================
 function formatarDataBR(dataString) {
     if (!dataString) return 'N/I';
     const partes = dataString.split('-');
@@ -795,12 +934,36 @@ function formatarDataBR(dataString) {
     return `${partes[2]}/${partes[1]}/${partes[0]}`;
 }
 
+function limparRastrosLocais() {
+    localStorage.removeItem('loggedInUserCPF');
+    localStorage.clear();
+}
+
 // ====================================================================
-// INICIALIZAÇÃO ASSÍNCRONA E LISTENERS DO ECOSSISTEMA DOM
+// INICIALIZAÇÃO ASSÍNCRONA E ESCUTADORES DOM
 // ====================================================================
 document.addEventListener('DOMContentLoaded', async () => {
     carregarDadosPerfil();
     
+    // Conecta formulário de Pacientes
+    const formNovoPaciente = document.getElementById('formNovoPaciente');
+    if (formNovoPaciente) {
+        formNovoPaciente.addEventListener('submit', cadastrarPaciente);
+    }
+
+    // Conecta formulário de Prontuários
+    const formNovoProntuario = document.getElementById('formNovoProntuario');
+    if (formNovoProntuario) {
+        formNovoProntuario.addEventListener('submit', publicarProntuario);
+    }
+
+    // Conecta formulário de Consultas
+    const formNovaConsulta = document.getElementById('formNovaConsulta');
+    if (formNovaConsulta) {
+        formNovaConsulta.addEventListener('submit', agendarConsulta);
+    }
+
+    // Carregamento Inicial das Listas
     await atualizarDropdownPacientes();
     await atualizarDropdownProfissionais();
     
@@ -808,31 +971,50 @@ document.addEventListener('DOMContentLoaded', async () => {
     await renderizarTabelaConsultas();
     await renderizarTabelaConsultasConcluidas();
     await renderizarTabelaProntuarios();
+    await renderizarTabelaAuditoria();
     
     await renderizarMinhasConsultas();
     await renderizarMinhasConsultasConcluidas();
     await atualizarPainelAtendimentos();
 
+    // =========================================================
+    // DEFINIÇÃO DE DATAS LIMITES PARA OS INPUTS
+    // =========================================================
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mes = String(hoje.getMonth() + 1).padStart(2, '0');
+    const dia = String(hoje.getDate()).padStart(2, '0');
+    const dataAtualFormatada = `${ano}-${mes}-${dia}`;
+
+    // Define data mínima para consultas (Hoje ou futuro)
     const inputDataConsulta = document.getElementById('consultaData');
     if (inputDataConsulta) {
-        const hoje = new Date();
-        const ano = hoje.getFullYear();
-        const mes = String(hoje.getMonth() + 1).padStart(2, '0');
-        const dia = String(hoje.getDate()).padStart(2, '0');
-        inputDataConsulta.min = `${ano}-${mes}-${dia}`;
+        inputDataConsulta.min = dataAtualFormatada;
     }
 
+    // Define data máxima para nascimento no cadastro (Hoje ou passado)
+    const inputDataNasc = document.getElementById('pacienteDataNasc');
+    if (inputDataNasc) {
+        inputDataNasc.max = dataAtualFormatada;
+    }
+
+    // Define data máxima para nascimento na edição (Hoje ou passado)
+    const inputEditDataNasc = document.getElementById('editPacienteDataNasc');
+    if (inputEditDataNasc) {
+        inputEditDataNasc.max = dataAtualFormatada;
+    }
+
+    // Filtros e buscas em tempo real
     document.getElementById('buscaPaciente')?.addEventListener('input', renderizarTabelaProntuarios);
     document.getElementById('buscaPacienteLista')?.addEventListener('input', renderizarTabelaPacientes);
     document.getElementById('buscaConsulta')?.addEventListener('input', renderizarTabelaConsultas);
     document.getElementById('buscaConsultaConcluida')?.addEventListener('input', renderizarTabelaConsultasConcluidas);
 
+    // Atualização de tabelas ao alternar abas Bootstrap
     document.getElementById('tab-historico-prontuarios')?.addEventListener('shown.bs.tab', renderizarTabelaProntuarios);
     document.getElementById('tab-pacientes-cadastrados')?.addEventListener('shown.bs.tab', renderizarTabelaPacientes);
     document.getElementById('tab-consultas-agendadas')?.addEventListener('shown.bs.tab', renderizarTabelaConsultas);
     document.getElementById('tab-consultas-concluidas')?.addEventListener('shown.bs.tab', renderizarTabelaConsultasConcluidas);
-    
-    // ATUALIZA A ABA DE AUDITORIA QUANDO CLICADA
     document.getElementById('tab-auditoria')?.addEventListener('shown.bs.tab', renderizarTabelaAuditoria);
     
     document.getElementById('tab-novo-prontuario')?.addEventListener('shown.bs.tab', atualizarDropdownPacientes);
@@ -847,9 +1029,3 @@ document.addEventListener('DOMContentLoaded', async () => {
         await renderizarMinhasConsultasConcluidas();
     });
 });
-
-function limparRastrosLocais() {
-    // Apaga os dados antigos do localStorage para não dar conflito com o novo sistema
-    localStorage.removeItem('loggedInUserCPF');
-    localStorage.clear();
-}
