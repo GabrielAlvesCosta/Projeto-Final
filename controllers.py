@@ -68,47 +68,61 @@ def get_consultas():
     status = request.args.get('status', 'ativas')
     with get_db() as db:
         db.row_factory = sqlite3.Row
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS consultas (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pacienteId INTEGER,
-                nomePaciente TEXT,
-                data TEXT,
-                horario TEXT,
-                profissional TEXT,
-                status TEXT
-            )
-        ''')
+        
+        # Utilizamos LEFT JOIN para buscar o nome do médico baseado no crm_coren
+        query = '''
+            SELECT c.*, u.nome as profissional
+            FROM consultas c
+            LEFT JOIN usuarios u ON c.crm_coren = u.crm_coren
+        '''
+        
         if status == 'ativas':
-            rows = db.execute("SELECT * FROM consultas WHERE status NOT IN ('Atendido', 'Cancelado') ORDER BY data ASC, horario ASC").fetchall()
+            query += " WHERE c.status NOT IN ('Atendido', 'Cancelado') ORDER BY c.data ASC, c.horario ASC"
         else:
-            rows = db.execute("SELECT * FROM consultas WHERE status IN ('Atendido', 'Cancelado') ORDER BY data DESC, horario DESC").fetchall()
+            query += " WHERE c.status IN ('Atendido', 'Cancelado') ORDER BY c.data DESC, c.horario DESC"
+            
+        rows = db.execute(query).fetchall()
         return jsonify([dict(r) for r in rows])
 
 @api.route('/consultas', methods=['POST'])
 def post_consulta():
     data = request.get_json() or {}
-    with get_db() as db:
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS consultas (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pacienteId INTEGER,
-                nomePaciente TEXT,
-                data TEXT,
-                horario TEXT,
-                profissional TEXT,
-                status TEXT
-            )
-        ''')
-        cursor = db.execute('''
-            INSERT INTO consultas (pacienteId, nomePaciente, data, horario, medicoId, status)
-            VALUES (?, ?, ?, ?, ?, ?)
-        ''', (
-            data.get('pacienteId'), data.get('nomePaciente'), data.get('data'),
-            data.get('horario'), data.get('medicoId'), data.get('status', 'Agendado')
-        ))
-        db.commit()
-        return jsonify({"status": "sucesso", "id": cursor.lastrowid}), 201
+    paciente_id = data.get('pacienteId')
+    crm_coren = data.get('crm_coren')
+
+    if not paciente_id or not crm_coren:
+        return jsonify({"error": "Paciente e Profissional (CRM/COREN) são obrigatórios."}), 400
+
+    try:
+        with get_db() as db:
+            # Valida se o paciente existe
+            paciente = db.execute('SELECT id FROM pacientes WHERE id = ?', (paciente_id,)).fetchone()
+            if not paciente:
+                return jsonify({"error": "O paciente selecionado não existe no banco de dados."}), 400
+
+            # Valida se o usuario/profissional existe
+            usuario = db.execute('SELECT crm_coren FROM usuarios WHERE crm_coren = ?', (crm_coren,)).fetchone()
+            if not usuario:
+                return jsonify({"error": f"O profissional com CRM/COREN '{crm_coren}' não está cadastrado no sistema."}), 400
+
+            # Insere a consulta com segurança
+            cursor = db.execute('''
+                INSERT INTO consultas (pacienteId, nomePaciente, data, horario, crm_coren, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                paciente_id, 
+                data.get('nomePaciente'), 
+                data.get('data'),
+                data.get('horario'), 
+                crm_coren, 
+                data.get('status', 'Agendado')
+            ))
+            db.commit()
+            return jsonify({"status": "sucesso", "id": cursor.lastrowid}), 201
+
+    except Exception as e:
+        print(f"Erro ao salvar consulta: {str(e)}")
+        return jsonify({"error": f"Erro interno ao agendar consulta: {str(e)}"}), 500
 
 @api.route('/consultas', methods=['PUT'])
 def put_consulta():
@@ -125,39 +139,6 @@ def put_consulta():
 def get_prontuarios():
     with get_db() as db:
         db.row_factory = sqlite3.Row
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS prontuarios (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                pacienteId INTEGER,
-                nomePaciente TEXT,
-                dataNascimento TEXT,
-                genero TEXT,
-                documento TEXT,
-                convenioCartao TEXT,
-                contatoPaciente TEXT,
-                acompanhante TEXT,
-                especialidade TEXT,
-                tipoAtendimento TEXT,
-                prioridade TEXT,
-                qp TEXT,
-                hda TEXT,
-                hmp TEXT,
-                alergias TEXT,
-                sinalPA TEXT,
-                sinalFC TEXT,
-                sinalFR TEXT,
-                sinalTEMP TEXT,
-                sinalSATO2 TEXT,
-                estadoGeral TEXT,
-                cardioResp TEXT,
-                neuroOutros TEXT,
-                hipotese TEXT,
-                conduta TEXT,
-                medicoCPF TEXT,
-                registroProfissional TEXT,
-                carimboAssinatura TEXT
-            )
-        ''')
         rows = db.execute('SELECT * FROM prontuarios ORDER BY id DESC').fetchall()
         return jsonify([dict(r) for r in rows])
 
@@ -166,59 +147,23 @@ def post_prontuario():
     data = request.get_json() or {}
     try:
         with get_db() as db:
-            # 1. Garante que as tabelas necessárias existem
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS prontuarios (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    pacienteId INTEGER,
-                    nomePaciente TEXT,
-                    dataNascimento TEXT,
-                    genero TEXT,
-                    documento TEXT,
-                    convenioCartao TEXT,
-                    contatoPaciente TEXT,
-                    acompanhante TEXT,
-                    especialidade TEXT,
-                    tipoAtendimento TEXT,
-                    prioridade TEXT,
-                    qp TEXT,
-                    hda TEXT,
-                    hmp TEXT,
-                    alergias TEXT,
-                    sinalPA TEXT,
-                    sinalFC TEXT,
-                    sinalFR TEXT,
-                    sinalTEMP TEXT,
-                    sinalSATO2 TEXT,
-                    estadoGeral TEXT,
-                    cardioResp TEXT,
-                    neuroOutros TEXT,
-                    hipotese TEXT,
-                    conduta TEXT,
-                    medicoCPF TEXT,
-                    registroProfissional TEXT,
-                    carimboAssinatura TEXT
-                )
-            ''')
-            db.execute('''
-                CREATE TABLE IF NOT EXISTS auditoria (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    data_hora TEXT,
-                    nome_profissional TEXT,
-                    usuario_cpf TEXT,
-                    acao TEXT,
-                    prontuario_id INTEGER,
-                    nome_paciente TEXT
-                )
-            ''')
+            # 1. Captura os dados da sessão
+            usuario_sessao = session.get('usuario', {})
+            crm_coren_logado = usuario_sessao.get('crm_coren') or data.get('crm_coren', 'S/N')
+            nome_profissional = usuario_sessao.get('nome', 'Profissional')
+            
+            # CORREÇÃO: Prioriza a imagem enviada via JSON; se vazia, pega da sessão
+            carimbo_enviado = data.get('carimboAssinatura')
+            carimbo_sessao = usuario_sessao.get('assinatura')
+            assinatura_final = carimbo_enviado if (carimbo_enviado and carimbo_enviado.strip() != '') else (carimbo_sessao or '')
 
-            # 2. Inserção do Prontuário Clínico
+            # 2. Insere o Prontuário Clínico
             cursor = db.execute('''
                 INSERT INTO prontuarios (
                     pacienteId, nomePaciente, dataNascimento, genero,
                     documento, convenioCartao, contatoPaciente, acompanhante, especialidade, tipoAtendimento,
                     prioridade, qp, hda, hmp, alergias, sinalPA, sinalFC, sinalFR, sinalTEMP, sinalSATO2,
-                    estadoGeral, cardioResp, neuroOutros, hipotese, conduta, medicoCPF, registroProfissional, carimboAssinatura
+                    estadoGeral, cardioResp, neuroOutros, hipotese, conduta, crm_coren, registroProfissional, carimboAssinatura
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
                 data.get('pacienteId'), data.get('nomePaciente'), data.get('dataNascimento'), data.get('genero'),
@@ -227,50 +172,73 @@ def post_prontuario():
                 data.get('hmp'), data.get('alergias'), data.get('sinalPA'), data.get('sinalFC'),
                 data.get('sinalFR'), data.get('sinalTEMP'), data.get('sinalSATO2'), data.get('estadoGeral'),
                 data.get('cardioResp'), data.get('neuroOutros'), data.get('hipotese'), data.get('conduta'),
-                data.get('medicoCPF'), data.get('registroProfissional'), data.get('carimboAssinatura')
+                crm_coren_logado, crm_coren_logado, assinatura_final
             ))
             
             prontuario_id = cursor.lastrowid
 
-            # 3. Inserção Automática do Log de Auditoria
+            # 3. Grava Log na Auditoria
             data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            usuario_sessao = session.get('usuario', {})
-            nome_prof = usuario_sessao.get('nome', 'Profissional')
-            cpf_prof = data.get('medicoCPF') or usuario_sessao.get('cpf', 'S/N')
-
             db.execute('''
-                INSERT INTO auditoria (data_hora, nome_profissional, usuario_cpf, acao, prontuario_id, nome_paciente)
+                INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (
                 data_hora_atual,
-                nome_prof,
-                cpf_prof,
+                nome_profissional,
+                crm_coren_logado,
                 'Criação',
                 prontuario_id,
-                data.get('nomePaciente', 'Paciente')
+                data.get('nomePaciente', 'N/A')
             ))
 
             db.commit()
             return jsonify({"status": "sucesso", "id": prontuario_id}), 201
 
     except Exception as e:
+        print(f"Erro Crítico ao salvar prontuário: {str(e)}")
         return jsonify({"error": f"Erro interno no servidor: {str(e)}"}), 500
+
+@api.route('/prontuarios/<int:id>', methods=['GET'])
+def get_prontuario_por_id(id):
+    try:
+        with get_db() as db:
+            db.row_factory = sqlite3.Row
+            # 1. Busca o prontuário no banco
+            prontuario = db.execute('SELECT * FROM prontuarios WHERE id = ?', (id,)).fetchone()
+            
+            if not prontuario:
+                return jsonify({"error": "Prontuário não encontrado"}), 404
+            
+            # 2. Captura os dados do usuário logado na sessão
+            usuario_sessao = session.get('usuario', {})
+            nome_prof = usuario_sessao.get('nome', 'Profissional')
+            crm_logado = usuario_sessao.get('crm_coren', 'N/A')
+            data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            
+            # 3. GRAVA AUTOMATICAMENTE A VISUALIZAÇÃO NA TABELA AUDITORIA
+            db.execute('''
+                INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                data_hora_atual,
+                nome_prof,
+                crm_logado,
+                'Visualização',
+                id,
+                prontuario['nomePaciente']
+            ))
+            db.commit()
+            
+            return jsonify(dict(prontuario)), 200
+
+    except Exception as e:
+        print(f"Erro ao visualizar prontuário: {str(e)}")
+        return jsonify({"error": f"Erro interno: {str(e)}"}), 500
 
 @api.route('/prontuarios/auditoria', methods=['GET'])
 def get_auditoria():
     with get_db() as db:
         db.row_factory = sqlite3.Row
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS auditoria (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data_hora TEXT,
-                nome_profissional TEXT,
-                usuario_cpf TEXT,
-                acao TEXT,
-                prontuario_id INTEGER,
-                nome_paciente TEXT
-            )
-        ''')
         rows = db.execute('SELECT * FROM auditoria ORDER BY id DESC').fetchall()
         return jsonify([dict(r) for r in rows])
 
@@ -278,29 +246,18 @@ def get_auditoria():
 def post_auditoria():
     data = request.get_json() or {}
     with get_db() as db:
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS auditoria (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                data_hora TEXT,
-                nome_profissional TEXT,
-                usuario_cpf TEXT,
-                acao TEXT,
-                prontuario_id INTEGER,
-                nome_paciente TEXT
-            )
-        ''')
-        
         data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
         usuario_sessao = session.get('usuario', {})
         nome_prof = usuario_sessao.get('nome', 'Profissional')
+        crm_logado = usuario_sessao.get('crm_coren', 'N/A')
         
         db.execute('''
-            INSERT INTO auditoria (data_hora, nome_profissional, usuario_cpf, acao, prontuario_id, nome_paciente)
+            INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             data_hora_atual,
             nome_prof,
-            data.get('usuario_cpf', 'N/A'),
+            data.get('crm_coren', crm_logado),
             data.get('acao', 'Visualização'),
             data.get('prontuario_id'),
             data.get('nome_paciente', 'N/A')

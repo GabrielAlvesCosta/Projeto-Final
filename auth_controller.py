@@ -64,7 +64,7 @@ class AuthController:
                 try:
                     # Tenta acessar usando chaves de texto (Dicionário / sqlite3.Row)
                     dados_sessao = {
-                        "id": usuario["id"],
+                        "id": usuario["id"],  # <--- ID ADICIONADO AQUI
                         "nome": usuario["nome"],
                         "email": usuario["email"],
                         "cargo": usuario["cargo"],
@@ -76,11 +76,11 @@ class AuthController:
                 except (KeyError, TypeError):
                     # Se falhar (for uma tupla simples), acessa por índices numéricos
                     dados_sessao = {
-                        "id": usuario[0],
-                        "nome": usuario[1],
-                        "email": usuario[2],
-                        "cargo": usuario[3],
-                        "crm_coren": usuario[4],
+                        "id": usuario[0],     # <--- ID ADICIONADO AQUI (Posição 0 no banco)
+                        "crm_coren": usuario[1],
+                        "nome": usuario[2],
+                        "email": usuario[3],
+                        "cargo": usuario[4],
                         "admin": usuario[6],
                         "assinatura": usuario[7]
                     }
@@ -159,7 +159,7 @@ class AuthController:
     def perfil():
         # Se o usuário enviou o formulário (Clicou em Salvar)
         if request.method == "POST":
-            usuario_id = session["usuario"]["id"]
+            usuario_id = session["usuario"]["id"]  # Usando o ID como identificador único
             nome = request.form.get("nome", "").strip()
             email = request.form.get("email", "").strip()
             senha = request.form.get("senha", "").strip()
@@ -180,7 +180,7 @@ class AuthController:
 
             # Chama a função que criamos no usuario.py
             from usuario import Usuario
-            Usuario.atualizar_perfil(usuario_id, nome, email, senha if senha else None, assinatura_filename)
+            Usuario.atualizar_perfil(nome, email, senha if senha else None, assinatura_filename)
 
             # Atualiza os dados na "memória" (sessão) para a tela não mostrar dados antigos
             session["usuario"]["nome"] = nome

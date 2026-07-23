@@ -9,6 +9,38 @@ function obterCRMCORENProfissionalLogado() {
     return window.usuarioLogado ? window.usuarioLogado.crm_coren : '';
 }
 
+// Busca a assinatura/carimbo do perfil do profissional logado
+function obterCarimboProfissionalLogado() {
+    if (!window.usuarioLogado) return '';
+    return window.usuarioLogado.assinatura || window.usuarioLogado.foto || window.usuarioLogado.carimboAssinatura || '';
+}
+
+// Normaliza qualquer caminho ou nome de arquivo para a rota HTTP do Flask (/static/uploads/...)
+function obterUrlCarimboValida(carimbo) {
+    if (!carimbo || carimbo === 'null' || carimbo === 'undefined' || typeof carimbo !== 'string') return '';
+    
+    let trimVal = carimbo.trim();
+    if (!trimVal) return '';
+
+    // 1. Se já possui o caminho relativo do Flask
+    if (trimVal.startsWith('/static/')) return trimVal;
+
+    // 2. Se for imagem em Base64 ou URL externa completa
+    if (trimVal.startsWith('data:') || trimVal.startsWith('http://') || trimVal.startsWith('https://')) {
+        return trimVal;
+    }
+
+    // 3. Normaliza barras do Windows (\ para /)
+    let caminhoLimpo = trimVal.replace(/\\/g, '/');
+
+    // 4. Extrai apenas o nome do arquivo final (ex: "1700000000_assinatura.png")
+    let nomeArquivo = caminhoLimpo.split('/').pop();
+    if (!nomeArquivo) return '';
+    
+    // 5. Retorna a rota estática padrão do Flask
+    return `/static/uploads/${nomeArquivo}`;
+}
+
 // ====================================================================
 // GESTÃO DE MÍDIA / PREVIEWS
 // ====================================================================
@@ -51,7 +83,10 @@ function carregarDadosPerfil() {
                 if (document.getElementById('perfilNome')) document.getElementById('perfilNome').value = user.nome || '';
                 if (document.getElementById('perfilEmail')) document.getElementById('perfilEmail').value = user.email || '';
                 if (document.getElementById('perfilCPF')) document.getElementById('perfilCPF').value = user.cpf || '';
-                if (document.getElementById('perfilFoto') && user.foto) document.getElementById('perfilFoto').src = user.foto;
+                
+                if (document.getElementById('perfilFoto') && user.foto) {
+                    document.getElementById('perfilFoto').src = obterUrlCarimboValida(user.foto);
+                }
             } catch(e) {
                 console.error("Erro ao carregar dados do perfil:", e);
             }
@@ -129,7 +164,7 @@ async function atualizarDropdownProfissionais() {
         const optionsHTML = '<option value="">Selecione o Médico / Especialista...</option>' + 
             usuarios.map(u => {
                 const nome = u.nome || u.username || 'Profissional Desconhecido';
-                return `<option value="${nome}">${nome}</option>`;
+                return `<option value="${u.crm_coren}">${nome}</option>`;
             }).join('');
 
         selectProfissional.innerHTML = optionsHTML;
@@ -144,10 +179,9 @@ async function atualizarDropdownProfissionais() {
 async function cadastrarPaciente(event) {
     if (event) event.preventDefault();
 
-    // TRAVA DE SEGURANÇA: Evita duplo clique
     const btnSubmit = document.querySelector('#formNovoPaciente button[type="submit"]');
     if (btnSubmit) {
-        if (btnSubmit.disabled) return; // Se já está salvando, interrompe
+        if (btnSubmit.disabled) return;
         btnSubmit.disabled = true;
         btnSubmit.dataset.texto = btnSubmit.innerHTML;
         btnSubmit.innerHTML = 'Salvando...';
@@ -160,7 +194,6 @@ async function cadastrarPaciente(event) {
     const dataNascVal = getVal('pacienteDataNasc');
     const hojeData = new Date().toISOString().split('T')[0];
     
-    // VALIDAÇÃO: Impede data de nascimento no futuro
     if (dataNascVal > hojeData) {
         if (btnSubmit) {
             btnSubmit.disabled = false;
@@ -204,7 +237,6 @@ async function cadastrarPaciente(event) {
         console.error("Erro ao cadastrar paciente:", e);
         alert("Erro ao cadastrar o paciente."); 
     } finally {
-        // Libera o botão independente de sucesso ou erro
         if (btnSubmit) {
             btnSubmit.disabled = false;
             btnSubmit.innerHTML = btnSubmit.dataset.texto;
@@ -343,7 +375,6 @@ async function agendarConsulta(event) {
             return alert("Erro crítico: Não é possível agendar uma consulta para uma data ou horário que já passou!");
         }
 
-        // TRAVA DE SEGURANÇA: Evita duplo clique
         const btnSubmit = document.querySelector('#formNovaConsulta button[type="submit"]');
         if (btnSubmit) {
             if (btnSubmit.disabled) return;
@@ -360,11 +391,9 @@ async function agendarConsulta(event) {
             nomePaciente: nomePaciente,
             data: dataInput,
             horario: horarioInput,
-            profissional: profissionalInput,
+            crm_coren: profissionalInput,
             status: 'Agendado'
         };
-
-        console.log("Tentando enviar os seguintes dados para o servidor:", novaConsulta);
 
         const response = await fetch('/api/consultas', {
             method: 'POST',
@@ -374,9 +403,6 @@ async function agendarConsulta(event) {
 
         if (!response.ok) {
             const errData = await response.json();
-            console.error("Resposta de erro do servidor:", errData);
-            
-            // Libera o botão se houver erro
             if (btnSubmit) {
                 btnSubmit.disabled = false;
                 btnSubmit.innerHTML = btnSubmit.dataset.texto;
@@ -399,7 +425,6 @@ async function agendarConsulta(event) {
             bootstrap.Tab.getOrCreateInstance(tab).show();
         }
 
-        // Restaura o botão após o sucesso
         if (btnSubmit) {
             btnSubmit.disabled = false;
             btnSubmit.innerHTML = btnSubmit.dataset.texto;
@@ -603,12 +628,12 @@ async function atualizarPainelAtendimentos() {
         const resProntuarios = await fetch('/api/prontuarios');
         const prontuarios = await resProntuarios.json();
 
-        const cpfLogado = localStorage.getItem('loggedInUserCPF');
+        const crmLogado = obterCRMCORENProfissionalLogado();
         const nomeProfissional = obterNomeProfissionalLogado();
 
         const ativasDoProfissional = ativas.filter(c => c.profissional === nomeProfissional);
         const concluidasDoProfissional = concluidas.filter(c => c.profissional === nomeProfissional);
-        const prontuariosDoProfissional = prontuarios.filter(p => p.medicoCPF === cpfLogado);
+        const prontuariosDoProfissional = prontuarios.filter(p => p.crm_coren === crmLogado);
 
         if (document.getElementById('count-consultas-ativas')) document.getElementById('count-consultas-ativas').textContent = ativasDoProfissional.length;
         if (document.getElementById('count-consultas-concluidas')) document.getElementById('count-consultas-concluidas').textContent = concluidasDoProfissional.length;
@@ -638,8 +663,9 @@ async function alterarStatusConsulta(id, novoStatus) {
 }
 
 // ====================================================================
-// PRONTUÁRIOS (PEP) E AUDITORIA (CORRIGIDO E UNIFICADO)
+// PRONTUÁRIOS (PEP) E AUDITORIA
 // ====================================================================
+
 async function publicarProntuario(event) {
     if (event) event.preventDefault();
 
@@ -651,7 +677,6 @@ async function publicarProntuario(event) {
         return;
     }
 
-    // TRAVA DE SEGURANÇA: Evita duplo clique
     const btnSubmit = document.querySelector('#formNovoProntuario button[type="submit"]');
     if (btnSubmit) {
         if (btnSubmit.disabled) return;
@@ -660,35 +685,11 @@ async function publicarProntuario(event) {
         btnSubmit.innerHTML = 'Publicando...';
     }
 
-    const cpfLogado = localStorage.getItem('loggedInUserCPF') || (window.usuarioLogado ? window.usuarioLogado.cpf : '');
-    let registroAutenticado = cpfLogado;
-    let carimboAutenticado = '';
-    const avatarPadrao = "https://cdn-icons-png.flaticon.com/512/3135/3135715.png";
-
-    if (cpfLogado) {
-        const dados = localStorage.getItem(cpfLogado);
-        if (dados) {
-            try {
-                const user = JSON.parse(dados);
-                registroAutenticado = user.cpf || cpfLogado;
-                if (user.foto && user.foto !== avatarPadrao && user.foto !== "") {
-                    carimboAutenticado = user.foto;
-                }
-            } catch(e) {}
-        }
-    }
-
-    if (!carimboAutenticado) {
-        alert("Aviso: Como você não possui uma foto de perfil ou carimbo salvo, a assinatura visual não sairá no registro. O seu CRM/CPF foi anexado para auditoria.");
-    }
-
     try {
-        // Busca a lista atualizada de pacientes
         const pRes = await fetch('/api/pacientes');
         if (!pRes.ok) throw new Error("Não foi possível validar o paciente no servidor.");
         
         const pacientes = await pRes.json();
-        // Uso de == (igualdade flexível) para evitar erros entre string e number
         const paciente = pacientes.find(p => p.id == pacienteId);
 
         if (!paciente) {
@@ -697,6 +698,14 @@ async function publicarProntuario(event) {
         }
 
         const getVal = (id) => document.getElementById(id) ? document.getElementById(id).value : '';
+
+        // Captura o preview da imagem do formulário OU herda a assinatura do perfil do profissional
+        const previewEl = document.getElementById('prontuarioCarimboPreview');
+        let carimboImg = (previewEl && !previewEl.classList.contains('d-none')) ? previewEl.src : '';
+
+        if (!carimboImg) {
+            carimboImg = obterCarimboProfissionalLogado();
+        }
 
         const novoProntuario = {
             pacienteId: paciente.id,
@@ -724,9 +733,7 @@ async function publicarProntuario(event) {
             neuroOutros: getVal('prontuarioNeuroOutros'),
             hipotese: getVal('prontuarioHipotese'),
             conduta: getVal('prontuarioConduta'),
-            medicoCPF: cpfLogado || 'anonimo',
-            registroProfissional: registroAutenticado,
-            carimboAssinatura: carimboAutenticado
+            carimboAssinatura: carimboImg
         };
 
         const res = await fetch('/api/prontuarios', {
@@ -741,6 +748,9 @@ async function publicarProntuario(event) {
             const form = document.getElementById('formNovoProntuario');
             if (form) form.reset();
             
+            const preview = document.getElementById('prontuarioCarimboPreview');
+            if (preview) preview.classList.add('d-none');
+
             await renderizarTabelaProntuarios();
             await atualizarPainelAtendimentos();
             await renderizarTabelaAuditoria(); 
@@ -757,7 +767,6 @@ async function publicarProntuario(event) {
         console.error("Erro na rotina de publicação do prontuário:", e);
         alert("❌ Ocorreu uma falha na requisição: " + e.message);
     } finally {
-        // Libera o botão independente de sucesso ou erro
         if (btnSubmit) {
             btnSubmit.disabled = false;
             btnSubmit.innerHTML = btnSubmit.dataset.texto;
@@ -788,13 +797,20 @@ async function renderizarTabelaProntuarios() {
 
         filtrados.forEach(p => {
             let cl = p.prioridade === 'Urgente' ? 'bg-warning text-dark' : (p.prioridade === 'Emergência' ? 'bg-danger text-white' : 'bg-success text-white');
-            const imgCarimbo = p.carimboAssinatura || 'https://cdn-icons-png.flaticon.com/512/2965/2965879.png';
             
+            // Sanitiza e normaliza a URL do carimbo/assinatura
+            const carimboBruto = p.carimboAssinatura || p.assinatura || p.foto;
+            const srcValida = obterUrlCarimboValida(carimboBruto);
+            
+            const avatarHtml = srcValida 
+                ? `<img src="${srcValida}" onerror="this.onerror=null; this.parentElement.innerHTML='<div class=\\'rounded-circle bg-light d-flex align-items-center justify-content-center text-primary fw-bold border\\' style=\\'width: 50px; height: 50px;\\'><i class=\\'bi bi-person-badge fs-4\\'></i></div>';" class="rounded-circle object-fit-cover shadow-sm bg-white" style="width: 50px; height: 50px; border: 1px solid #dee2e6;">`
+                : `<div class="rounded-circle bg-light d-flex align-items-center justify-content-center text-primary fw-bold border" style="width: 50px; height: 50px;"><i class="bi bi-person-badge fs-4"></i></div>`;
+
             tabela.insertAdjacentHTML('beforeend', `
                 <tr>
                     <td>
                         <div class="d-flex align-items-center gap-3">
-                            <img src="${imgCarimbo}" class="rounded-circle object-fit-cover shadow-sm bg-white" style="width: 50px; height: 50px; border: 1px solid #dee2e6;">
+                            ${avatarHtml}
                             <div>
                                 <h6 class="mb-1 fw-bold text-dark">${p.nomePaciente || 'Paciente Sem Nome'}</h6>
                                 <div class="text-muted small">${p.tipoAtendimento || 'Consulta'} > ${p.convenioCartao || 'S/N'}</div>
@@ -811,7 +827,7 @@ async function renderizarTabelaProntuarios() {
                         <span class="text-primary fw-medium">Contato: ${p.contatoPaciente || 'N/I'}</span>
                     </td>
                     <td class="text-end text-nowrap">
-                        <button class="btn btn-sm btn-outline-info" onclick="abrirEdicaoProntuario(${p.id})">
+                        <button class="btn btn-sm btn-outline-info" onclick="abrirProntuario(${p.id})">
                             <i class="bi bi-eye"></i> Ver
                         </button>
                     </td>
@@ -823,24 +839,15 @@ async function renderizarTabelaProntuarios() {
     }
 }
 
-async function abrirEdicaoProntuario(id) {
+async function abrirProntuario(id) {
     try {
-        const res = await fetch('/api/prontuarios');
-        const prontuarios = await res.json();
-        const prontuario = prontuarios.find(p => p.id == id);
-        if (!prontuario) return alert("Prontuário não localizado.");
+        const res = await fetch(`/api/prontuarios/${id}`);
+        if (!res.ok) return alert("Prontuário não localizado.");
+        
+        const prontuario = await res.json();
 
-        const cpfLogado = localStorage.getItem('loggedInUserCPF');
-        if (cpfLogado) {
-            fetch('/api/prontuarios/auditoria', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ prontuario_id: id, usuario_cpf: cpfLogado, acao: 'Visualização', nome_paciente: prontuario.nomePaciente })
-            }).catch(e => console.error("Falha ao registrar auditoria de visualização:", e));
-        }
-
-        const setTxt = (id, val) => { if (document.getElementById(id)) document.getElementById(id).textContent = val || 'Não informado'; };
-        const setVal = (id, val) => { if (document.getElementById(id)) document.getElementById(id).value = val || ''; };
+        const setTxt = (elemId, val) => { if (document.getElementById(elemId)) document.getElementById(elemId).textContent = val || 'Não informado'; };
+        const setVal = (elemId, val) => { if (document.getElementById(elemId)) document.getElementById(elemId).value = val || ''; };
 
         setTxt('editProntuarioNome', prontuario.nomePaciente);
         setTxt('editProntuarioNasc', formatarDataBR(prontuario.dataNascimento));
@@ -865,19 +872,30 @@ async function abrirEdicaoProntuario(id) {
         setVal('editProntuarioHD', prontuario.hipotese);
         setVal('editProntuarioConduta', prontuario.conduta);
         setVal('editProntuarioPrioridade', prontuario.prioridade || 'Normal');
-        setTxt('editProntuarioRegistro', prontuario.registroProfissional);
+        setTxt('editProntuarioRegistro', prontuario.registroProfissional || prontuario.crm_coren);
 
+        // Tratamento do Carimbo / Assinatura Digital no Modal com validação estrita de URL
         const imgCarimbo = document.getElementById('editProntuarioCarimboView');
         const wrapper = document.getElementById('wrapperCarimboVisualizar');
+        const carimboBruto = prontuario.carimboAssinatura || prontuario.assinatura || prontuario.foto;
+        const srcValida = obterUrlCarimboValida(carimboBruto);
+
         if (imgCarimbo && wrapper) {
-            if (prontuario.carimboAssinatura) {
-                imgCarimbo.src = prontuario.carimboAssinatura;
+            if (srcValida) {
+                imgCarimbo.src = srcValida;
+                imgCarimbo.onerror = function() {
+                    this.onerror = null;
+                    wrapper.classList.add('d-none');
+                };
                 wrapper.classList.remove('d-none');
             } else {
                 imgCarimbo.src = "";
                 wrapper.classList.add('d-none');
             }
         }
+
+        // Atualiza a tabela de auditoria para exibir o log de 'Visualização' gravado
+        await renderizarTabelaAuditoria();
 
         const modalEl = document.getElementById('modalEditarProntuario');
         if (modalEl && typeof bootstrap !== 'undefined') {
@@ -911,7 +929,7 @@ async function renderizarTabelaAuditoria() {
                     <td class="fw-bold text-secondary">${l.data_hora}</td>
                     <td>
                         <strong>${l.nome_profissional || 'Desconhecido'}</strong><br>
-                        <small class="text-muted">CPF/ID: ${l.usuario_cpf}</small>
+                        <small class="text-muted">CRM/COREN: ${l.crm_coren || 'N/A'}</small>
                     </td>
                     <td><span class="badge ${badgeClass}">${l.acao}</span></td>
                     <td class="text-primary fw-bold">#${l.prontuario_id || 'N/A'}</td>
@@ -977,28 +995,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     await renderizarMinhasConsultasConcluidas();
     await atualizarPainelAtendimentos();
 
-    // =========================================================
     // DEFINIÇÃO DE DATAS LIMITES PARA OS INPUTS
-    // =========================================================
     const hoje = new Date();
     const ano = hoje.getFullYear();
     const mes = String(hoje.getMonth() + 1).padStart(2, '0');
     const dia = String(hoje.getDate()).padStart(2, '0');
     const dataAtualFormatada = `${ano}-${mes}-${dia}`;
 
-    // Define data mínima para consultas (Hoje ou futuro)
     const inputDataConsulta = document.getElementById('consultaData');
     if (inputDataConsulta) {
         inputDataConsulta.min = dataAtualFormatada;
     }
 
-    // Define data máxima para nascimento no cadastro (Hoje ou passado)
     const inputDataNasc = document.getElementById('pacienteDataNasc');
     if (inputDataNasc) {
         inputDataNasc.max = dataAtualFormatada;
     }
 
-    // Define data máxima para nascimento na edição (Hoje ou passado)
     const inputEditDataNasc = document.getElementById('editPacienteDataNasc');
     if (inputEditDataNasc) {
         inputEditDataNasc.max = dataAtualFormatada;

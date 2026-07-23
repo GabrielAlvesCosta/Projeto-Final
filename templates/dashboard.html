@@ -701,7 +701,10 @@
     }
 </script>
 
-<!-- A chamada do seu JS deve ficar logo abaixo -->
+<script>
+    // Converte a sessão Python para um objeto JSON acessível via JavaScript
+    window.usuarioLogado = {{ usuario | tojson | safe if usuario else '{}' }};
+</script>
 <script src="{{ url_for('static', filename='dashboard.js') }}"></script>
 </body>
 </html>

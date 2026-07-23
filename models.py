@@ -37,10 +37,10 @@ def init_db():
         c.execute('''
             CREATE TABLE IF NOT EXISTS usuarios (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
+                crm_coren TEXT UNIQUE,
                 nome TEXT,
                 email TEXT UNIQUE,
                 cargo TEXT,
-                crm_coren TEXT,
                 senha TEXT,
                 admin TEXT DEFAULT 'nao',
                 assinatura TEXT DEFAULT ''
@@ -60,16 +60,18 @@ def init_db():
             )
         ''')
         
+        # CORREÇÃO: REFERENCES usuarios(crm_coren)
         c.execute('''
             CREATE TABLE IF NOT EXISTS consultas (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 pacienteId INTEGER, nomePaciente TEXT, data TEXT, horario TEXT,
-                medicoId INTEGER, status TEXT,
+                crm_coren TEXT, status TEXT,
                 FOREIGN KEY (pacienteId) REFERENCES pacientes(id),
-                FOREIGN KEY (medicoId) REFERENCES usuarios(id)
+                FOREIGN KEY (crm_coren) REFERENCES usuarios(crm_coren) 
             )
         ''')
         
+        # CORREÇÃO: REFERENCES usuarios(crm_coren)
         c.execute('''
             CREATE TABLE IF NOT EXISTS prontuarios (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -79,17 +81,23 @@ def init_db():
                 registroProfissional TEXT, carimboAssinatura TEXT, qp TEXT, hda TEXT, hmp TEXT, alergias TEXT,
                 sinalPA TEXT, sinalFC TEXT, sinalFR TEXT, sinalTEMP TEXT, sinalSATO2 TEXT,
                 estadoGeral TEXT, cardioResp TEXT, neuroOutros TEXT, hipotese TEXT, conduta TEXT,
-                medicoId INTEGER,
+                crm_coren TEXT,
                 FOREIGN KEY (pacienteId) REFERENCES pacientes(id),
-                FOREIGN KEY (medicoId) REFERENCES usuarios(id)
+                FOREIGN KEY (crm_coren) REFERENCES usuarios(crm_coren)
             )
         ''')
 
+        # CORREÇÃO: REFERENCES usuarios(crm_coren)
         c.execute('''
-            CREATE TABLE IF NOT EXISTS auditoria_prontuarios (
+            CREATE TABLE IF NOT EXISTS auditoria (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                usuario_id INTEGER, prontuario_id INTEGER, acao TEXT, data_hora TEXT,
-                FOREIGN KEY (usuario_id) REFERENCES usuarios(id),
+                data_hora TEXT,
+                nome_profissional TEXT,
+                crm_coren TEXT,
+                acao TEXT,
+                prontuario_id INTEGER,
+                nome_paciente TEXT,
+                FOREIGN KEY (crm_coren) REFERENCES usuarios(crm_coren),
                 FOREIGN KEY (prontuario_id) REFERENCES prontuarios(id)
             )
         ''')
