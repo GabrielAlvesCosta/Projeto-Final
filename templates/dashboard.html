@@ -159,7 +159,7 @@
                             
                             {% if usuario.assinatura %}
                                 <p class="mt-2 mb-1">Assinatura atual:</p>
-                                <img src="{{ url_for('static', filename='uploads/' + usuario.assinatura) }}" alt="Assinatura" style="max-height: 80px; border: 1px solid #ccc; padding: 5px;">
+                                <img src="{{ url_for('assinatura', filename=usuario.assinatura) }}" alt="Assinatura" style="max-height: 80px; border: 1px solid #ccc; padding: 5px;">
                             {% endif %}
 
                             <div style="margin-top: 20px;">

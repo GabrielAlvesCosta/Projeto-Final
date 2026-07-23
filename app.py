@@ -1,10 +1,20 @@
-from flask import Flask, render_template, session, redirect, url_for, request
-from models import init_db
+import os
+import sqlite3
+import mimetypes
+from datetime import timedelta
+from flask import Flask, render_template, session, redirect, url_for, request, Response
+from werkzeug.utils import secure_filename
+from models import init_db, cipher
 from controllers import api
 from auth_controller import AuthController
 
-app = Flask(__name__, static_folder='Static') 
-app.secret_key = "chave_mestra_clinical_pep"
+app = Flask(__name__, static_folder='Static')
+app.secret_key = os.urandom(32)
+app.config.update({
+    'SESSION_COOKIE_HTTPONLY': True,
+    'SESSION_COOKIE_SAMESITE': 'Lax',
+    'PERMANENT_SESSION_LIFETIME': timedelta(minutes=30)
+})
 
 # 1. Inicia o banco de dados e cria tabelas
 init_db()
@@ -53,14 +63,24 @@ def dashboard():
     # Enviamos a lista de pacientes para o HTML!
     return render_template("dashboard.html", usuario=session["usuario"], pacientes=pacientes_lista)
 
+def is_admin():
+    return "usuario" in session and str(session["usuario"].get("admin", "nao")).strip().lower() == "sim"
+
+@app.route("/admin")
+def admin():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    if not is_admin():
+        return render_template("403.html"), 403
+    return AuthController.usuarios()
+
 @app.route("/usuarios")
 def usuarios():
     if "usuario" not in session:
         return redirect(url_for("login"))
     
-    # Apenas administradores entram aqui!
-    if str(session["usuario"].get("admin", "nao")).lower() != "sim":
-        return redirect(url_for("dashboard"))
+    if not is_admin():
+        return render_template("403.html"), 403
         
     return AuthController.usuarios()
 
@@ -68,7 +88,36 @@ def usuarios():
 def editar_usuario(id):
     if "usuario" not in session:
         return redirect(url_for("login"))
+    if not is_admin():
+        return render_template("403.html"), 403
     return AuthController.editar_usuario_post(id)
+
+@app.route('/assinatura/<path:filename>')
+def assinatura(filename):
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+
+    usuario = session["usuario"]
+    if str(usuario.get("admin", "nao")).strip().lower() != "sim" and filename != usuario.get("assinatura"):
+        return render_template("403.html"), 403
+
+    secure_name = secure_filename(filename)
+    file_path = os.path.join("Static", "uploads", secure_name)
+    if not os.path.isfile(file_path):
+        return "Arquivo não encontrado", 404
+
+    with open(file_path, "rb") as f:
+        encrypted_data = f.read()
+
+    try:
+        decrypted_data = cipher.decrypt(encrypted_data)
+    except Exception:
+        # Se a assinatura estiver armazenada em formato legível antigo,
+        # retornamos os dados brutos para compatibilidade com arquivos existentes.
+        decrypted_data = encrypted_data
+
+    mime_type = mimetypes.guess_type(secure_name)[0] or "application/octet-stream"
+    return Response(decrypted_data, mimetype=mime_type)
 
 @app.route("/perfil", methods=["GET", "POST"])
 def perfil():
@@ -131,4 +180,9 @@ def cadastrar_paciente():
     return redirect(url_for("dashboard"))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    try:
+        app.run(debug=True, use_reloader=False, port=5001)
+    except OSError as ex:
+        print('Falha ao iniciar em 5001. Detalhes:', ex)
+        print('Tentando iniciar em 5002...')
+        app.run(debug=True, use_reloader=False, port=5002)
