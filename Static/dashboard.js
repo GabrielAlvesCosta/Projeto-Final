@@ -724,6 +724,13 @@ async function publicarProntuario(event) {
             carimboImg = obterCarimboProfissionalLogado();
         }
 
+        console.log("📸 Imagem do Carimbo capturada:", {
+            veioDoPreview: previewEl ? previewEl.src : null,
+            previewEstaVisivel: previewEl ? !previewEl.classList.contains('d-none') : false,
+            veioDoPerfil: obterCarimboProfissionalLogado(),
+            resultadoFinal: carimboImg
+        });
+
         const novoProntuario = {
             pacienteId: paciente.id,
             nomePaciente: paciente.nome,

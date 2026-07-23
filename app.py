@@ -4,7 +4,7 @@ from models import init_db, get_db, en, de
 from controllers import api
 from auth_controller import AuthController
 
-app = Flask(__name__, static_folder='Static') 
+app = Flask(__name__, static_folder='static') 
 app.secret_key = "chave_mestra_clinical_pep"
 
 # 1. Inicia a estrutura do banco de dados
