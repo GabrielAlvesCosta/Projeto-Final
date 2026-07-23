@@ -1,11 +1,25 @@
-from flask import Flask, render_template, session, redirect, url_for, request
+import os
 import sqlite3
-from models import init_db, get_db, en, de
+import mimetypes
+from datetime import timedelta
+from flask import Flask, render_template, session, redirect, url_for, request, Response
+from werkzeug.utils import secure_filename
+
+# Combinação das importações necessárias das duas versões
+from models import init_db, get_db, cipher, en, de
 from controllers import api
 from auth_controller import AuthController
 
+# Mantido o static em minúsculo conforme a correção que fizemos
 app = Flask(__name__, static_folder='static') 
 app.secret_key = "chave_mestra_clinical_pep"
+
+# Adicionado as configurações de segurança de sessão da versão remota
+app.config.update({
+    'SESSION_COOKIE_HTTPONLY': True,
+    'SESSION_COOKIE_SAMESITE': 'Lax',
+    'PERMANENT_SESSION_LIFETIME': timedelta(minutes=30)
+})
 
 # 1. Inicia a estrutura do banco de dados
 init_db()
@@ -46,7 +60,7 @@ def dashboard():
             db.row_factory = sqlite3.Row
             pacientes_db = db.execute('SELECT * FROM pacientes ORDER BY id DESC').fetchall()
             
-            # Descriptografa os pacientes para exibição no Dashboard HTML
+            # Mantida a sua lógica de descriptografar os pacientes para exibição no Dashboard HTML
             for p in pacientes_db:
                 p_dict = dict(p)
                 p_dict['nome'] = de(p_dict.get('nome'))
@@ -57,20 +71,33 @@ def dashboard():
                 p_dict['contato'] = de(p_dict.get('contato'))
                 pacientes_descriptografados.append(p_dict)
                 
-            # Opcional: Reordenar alfabeticamente após descriptografar
+            # Mantida a reordenação alfabética após descriptografar
             pacientes_descriptografados = sorted(pacientes_descriptografados, key=lambda k: (k['nome'] or '').lower())
     except Exception as e:
         print(f"Erro ao carregar dashboard: {e}")
         
     return render_template("dashboard.html", usuario=session["usuario"], pacientes=pacientes_descriptografados)
 
+# Helper de verificação de admin da versão remota
+def is_admin():
+    return "usuario" in session and str(session["usuario"].get("admin", "nao")).strip().lower() == "sim"
+
+@app.route("/admin")
+def admin():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    if not is_admin():
+        return render_template("403.html"), 403
+    return AuthController.usuarios()
+
 @app.route("/usuarios")
 def usuarios():
     if "usuario" not in session:
         return redirect(url_for("login"))
     
-    if str(session["usuario"].get("admin", "nao")).lower() != "sim":
-        return redirect(url_for("dashboard"))
+    # Utilizando o helper is_admin e retornando erro 403 apropriado
+    if not is_admin():
+        return render_template("403.html"), 403
         
     return AuthController.usuarios()
 
@@ -78,7 +105,36 @@ def usuarios():
 def editar_usuario(id):
     if "usuario" not in session:
         return redirect(url_for("login"))
+    if not is_admin():
+        return render_template("403.html"), 403
     return AuthController.editar_usuario_post(id)
+
+# Rota de visualização segura de assinaturas da versão remota
+@app.route('/assinatura/<path:filename>')
+def assinatura(filename):
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+
+    usuario = session["usuario"]
+    if str(usuario.get("admin", "nao")).strip().lower() != "sim" and filename != usuario.get("assinatura"):
+        return render_template("403.html"), 403
+
+    secure_name = secure_filename(filename)
+    # Aqui ajustamos para 'static' em minúsculo para manter consistência com sua correção
+    file_path = os.path.join("static", "uploads", secure_name)
+    if not os.path.isfile(file_path):
+        return "Arquivo não encontrado", 404
+
+    with open(file_path, "rb") as f:
+        encrypted_data = f.read()
+
+    try:
+        decrypted_data = cipher.decrypt(encrypted_data)
+    except Exception:
+        decrypted_data = encrypted_data
+
+    mime_type = mimetypes.guess_type(secure_name)[0] or "application/octet-stream"
+    return Response(decrypted_data, mimetype=mime_type)
 
 @app.route("/perfil", methods=["GET", "POST"])
 def perfil():
@@ -110,7 +166,7 @@ def cadastrar_paciente():
     contato = request.form.get("contato", "Não informado").strip()
     
     with get_db() as db:
-        # Criptografa os dados sensíveis antes de salvar no banco de dados
+        # Mantida a sua lógica de criptografar os dados sensíveis antes de salvar no banco
         db.execute('''
             INSERT INTO pacientes (nome, dataNasc, genero, documento, cartao, contato)
             VALUES (?, ?, ?, ?, ?, ?)
@@ -127,4 +183,10 @@ def cadastrar_paciente():
     return redirect(url_for("dashboard"))
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    # Mantido o try/except para falhas de porta
+    try:
+        app.run(debug=True, use_reloader=False, port=5000)
+    except OSError as ex:
+        print('Falha ao iniciar em 5000. Detalhes:', ex)
+        print('Tentando iniciar em 5001...')
+        app.run(debug=True, use_reloader=False, port=5001)  
