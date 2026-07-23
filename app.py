@@ -4,26 +4,36 @@ import mimetypes
 from datetime import timedelta
 from flask import Flask, render_template, session, redirect, url_for, request, Response
 from werkzeug.utils import secure_filename
-from models import init_db, cipher
+# Combinação das importações necessárias das duas versões
+from models import init_db, get_db, cipher, en, de
 from controllers import api
 from auth_controller import AuthController
 
-app = Flask(__name__, static_folder='Static')
-app.secret_key = os.urandom(32)
+# Mantido o static em minúsculo conforme a correção que fizemos
+app = Flask(__name__, static_folder='static') 
+app.secret_key = "chave_mestra_clinical_pep"
+
+# Configurações de segurança de sessão da versão remota
+app.config.update({
+    'SESSION_COOKIE_HTTPONLY': True,
+    'SESSION_COOKIE_SAMESITE': 'Lax',
+    'PERMANENT_SESSION_LIFETIME': timedelta(minutes=30)
+})
+# Adicionado as configurações de segurança de sessão da versão remota
 app.config.update({
     'SESSION_COOKIE_HTTPONLY': True,
     'SESSION_COOKIE_SAMESITE': 'Lax',
     'PERMANENT_SESSION_LIFETIME': timedelta(minutes=30)
 })
 
-# 1. Inicia o banco de dados e cria tabelas
+# 1. Inicia a estrutura do banco de dados
 init_db()
 
-# 2. Regista as rotas antigas de API (Pacientes, Consultas, Prontuarios)
+# 2. Registra o Blueprint das APIs (/api/pacientes, /api/prontuarios, etc.)
 app.register_blueprint(api, url_prefix='/api')
 
 # ==============================================================
-# ROTAS FRONTEND E DE SESSÃO
+# ROTAS FRONTEND E GESTÃO DE SESSÃO
 # ==============================================================
 @app.route("/")
 def home():
@@ -43,25 +53,47 @@ def login():
 def logout():
     return AuthController.logout()
 
-# A MÁGICA: O Dashboard agora é injetado pelo Flask!
 @app.route("/dashboard")
 def dashboard():
     if "usuario" not in session:
         return redirect(url_for("login"))
         
-    from models import get_db
-    pacientes_lista = []
+    pacientes_descriptografados = []
     
     try:
         with get_db() as db:
-            # Tenta buscar os pacientes (se a tabela já existir)
-            db.row_factory = sqlite3.Row # Para podermos aceder pelo nome da coluna
-            pacientes_lista = db.execute('SELECT * FROM pacientes ORDER BY nome ASC').fetchall()
-    except:
-        pass # Se a tabela ainda não existir, envia uma lista vazia
+            db.row_factory = sqlite3.Row
+            pacientes_db = db.execute('SELECT * FROM pacientes ORDER BY id DESC').fetchall()
+            
+            # Mantida a sua lógica de descriptografar os pacientes para exibição no Dashboard HTML
+            for p in pacientes_db:
+                p_dict = dict(p)
+                p_dict['nome'] = de(p_dict.get('nome'))
+                p_dict['dataNasc'] = de(p_dict.get('dataNasc'))
+                p_dict['genero'] = de(p_dict.get('genero'))
+                p_dict['documento'] = de(p_dict.get('documento'))
+                p_dict['cartao'] = de(p_dict.get('cartao'))
+                p_dict['contato'] = de(p_dict.get('contato'))
+                pacientes_descriptografados.append(p_dict)
+                
+            # Mantida a reordenação alfabética após descriptografar
+            pacientes_descriptografados = sorted(pacientes_descriptografados, key=lambda k: (k['nome'] or '').lower())
+    except Exception as e:
+        print(f"Erro ao carregar dashboard: {e}")
         
-    # Enviamos a lista de pacientes para o HTML!
-    return render_template("dashboard.html", usuario=session["usuario"], pacientes=pacientes_lista)
+    return render_template("dashboard.html", usuario=session["usuario"], pacientes=pacientes_descriptografados)
+
+# Helper de verificação de admin da versão remota
+def is_admin():
+    return "usuario" in session and str(session["usuario"].get("admin", "nao")).strip().lower() == "sim"
+
+@app.route("/admin")
+def admin():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    if not is_admin():
+        return render_template("403.html"), 403
+    return AuthController.usuarios()
 
 def is_admin():
     return "usuario" in session and str(session["usuario"].get("admin", "nao")).strip().lower() == "sim"
@@ -102,7 +134,7 @@ def assinatura(filename):
         return render_template("403.html"), 403
 
     secure_name = secure_filename(filename)
-    file_path = os.path.join("Static", "uploads", secure_name)
+file_path = os.path.join("static", "uploads", secure_name)
     if not os.path.isfile(file_path):
         return "Arquivo não encontrado", 404
 
@@ -112,8 +144,6 @@ def assinatura(filename):
     try:
         decrypted_data = cipher.decrypt(encrypted_data)
     except Exception:
-        # Se a assinatura estiver armazenada em formato legível antigo,
-        # retornamos os dados brutos para compatibilidade com arquivos existentes.
         decrypted_data = encrypted_data
 
     mime_type = mimetypes.guess_type(secure_name)[0] or "application/octet-stream"
@@ -121,15 +151,12 @@ def assinatura(filename):
 
 @app.route("/perfil", methods=["GET", "POST"])
 def perfil():
-    # Se não estiver logado, manda pro login
     if "usuario" not in session:
         return redirect(url_for("login"))
         
-    # Se tentar recarregar a página ou acessar por link (GET), mandamos pro Dashboard
     if request.method == "GET":
         return redirect(url_for("dashboard"))
         
-    # Se estiver enviando o formulário (POST), o controlador processa a atualização
     return AuthController.perfil()
 
 @app.route("/cadastrar_paciente", methods=["POST"])
@@ -137,52 +164,42 @@ def cadastrar_paciente():
     if "usuario" not in session:
         return redirect(url_for("login"))
     
-    # Capturar dados do formulário
-# O segundo parâmetro é o valor padrão caso venha vazio do HTML
     nome = request.form.get("nome", "Sem Nome").strip()
     data_nasc_crua = request.form.get("data_nasc", "").strip() 
     
-    # 2. Converte a data de AAAA-MM-DD para DD/MM/AAAA
     data_nasc_formatada = "00/00/0000"
     if data_nasc_crua:
-        partes_data = data_nasc_crua.split("-") # Separa o Ano, Mês e Dia
+        partes_data = data_nasc_crua.split("-")
         if len(partes_data) == 3:
             data_nasc_formatada = f"{partes_data[2]}/{partes_data[1]}/{partes_data[0]}"
+            
     genero = request.form.get("genero", "Não informado")
     documento = request.form.get("documento", "Não informado").strip()
     cartao = request.form.get("cartao", "Não informado").strip()
     contato = request.form.get("contato", "Não informado").strip()
     
-    # Ligar à base de dados e guardar
-    from models import get_db
     with get_db() as db:
-        
-        # Garantir que a tabela existe
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS pacientes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                dataNasc TEXT NOT NULL,
-                genero TEXT NOT NULL,
-                documento TEXT NOT NULL,
-                cartao TEXT NOT NULL,
-                contato TEXT NOT NULL
-            )
-        ''')
-        
-        # Inserir o novo paciente
+        # Mantida a sua lógica de criptografar os dados sensíveis antes de salvar no banco
         db.execute('''
             INSERT INTO pacientes (nome, dataNasc, genero, documento, cartao, contato)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (nome, data_nasc_formatada, genero, documento, cartao, contato))
+        ''', (
+            en(nome), 
+            en(data_nasc_formatada), 
+            en(genero), 
+            en(documento), 
+            en(cartao), 
+            en(contato)
+        ))
         db.commit()
     
     return redirect(url_for("dashboard"))
 
 if __name__ == '__main__':
+# Mantido o try/except para falhas de porta
     try:
-        app.run(debug=True, use_reloader=False, port=5001)
+        app.run(debug=True, use_reloader=False, port=5000)
     except OSError as ex:
-        print('Falha ao iniciar em 5001. Detalhes:', ex)
-        print('Tentando iniciar em 5002...')
-        app.run(debug=True, use_reloader=False, port=5002)
+        print('Falha ao iniciar em 5000. Detalhes:', ex)
+        print('Tentando iniciar em 5001...')
+        app.run(debug=True, use_reloader=False, port=5001)

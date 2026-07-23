@@ -29,13 +29,11 @@ class AuthController:
 
             if crm_coren and Usuario.crm_coren_existe(crm_coren):
                 return render_template("cadastro.html", error="CRM/COREN já cadastrado")
-
-            # Upload da Assinatura Digital
             file = request.files.get("assinatura")
             assinatura_filename = ""
             if file and file.filename != "":
                 filename = f"{int(time.time())}_{secure_filename(file.filename)}"
-                upload_path = os.path.join("Static", "uploads")
+                upload_path = os.path.join("static", "uploads")
                 os.makedirs(upload_path, exist_ok=True)
                 data = file.read()
                 encrypted_data = cipher.encrypt(data)
@@ -70,11 +68,10 @@ class AuthController:
 
             usuario = Usuario.autenticar(email, senha)
             if usuario:
-                # Marcamos a sessão como permanente para suportar expiração segura
+              
                 session.permanent = True
-                # Tratamento robusto para suportar tanto dicionários/Row quanto tuplas do banco
+
                 try:
-                    # Tenta acessar usando chaves de texto (Dicionário / sqlite3.Row)
                     dados_sessao = {
                         "id": usuario["id"],
                         "nome": usuario["nome"],
@@ -86,7 +83,6 @@ class AuthController:
                     }
                     admin_value = str(usuario["admin"] or "nao").strip().lower()
                 except (KeyError, TypeError):
-                    # Se falhar (for uma tupla simples), acessa por índices numéricos
                     dados_sessao = {
                         "id": usuario[0],
                         "nome": usuario[1],
@@ -98,7 +94,6 @@ class AuthController:
                     }
                     admin_value = str(usuario[7] or "nao").strip().lower()
 
-                # Salva os dados tratados na sessão
                 session["usuario"] = dados_sessao
 
                 if admin_value == "sim":
@@ -161,7 +156,7 @@ class AuthController:
 
         if file and file.filename != "":
             filename = f"{int(time.time())}_{secure_filename(file.filename)}"
-            upload_path = os.path.join("Static", "uploads")
+            upload_path = os.path.join("static", "uploads")
             os.makedirs(upload_path, exist_ok=True)
             data = file.read()
             encrypted_data = cipher.encrypt(data)
@@ -177,23 +172,18 @@ class AuthController:
     
     @staticmethod
     def perfil():
-        # Se o usuário enviou o formulário (Clicou em Salvar)
         if request.method == "POST":
             usuario_id = session["usuario"]["id"]
             nome = request.form.get("nome", "").strip()
             email = request.form.get("email", "").strip()
             senha = request.form.get("senha", "").strip()
             
-            # Repare: Nós NÃO capturamos 'cargo' nem 'crm_coren' do request.form.
-            # Mesmo que um hacker tente forçar o envio desses dados, o Python vai ignorar.
-
             file = request.files.get("assinatura")
             assinatura_filename = None
 
-            # Lógica de salvar a imagem
             if file and file.filename != "":
                 filename = f"{int(time.time())}_{secure_filename(file.filename)}"
-                upload_path = os.path.join("Static", "uploads")
+                upload_path = os.path.join("static", "uploads")
                 os.makedirs(upload_path, exist_ok=True)
                 data = file.read()
                 encrypted_data = cipher.encrypt(data)
@@ -201,19 +191,16 @@ class AuthController:
                     f.write(encrypted_data)
                 assinatura_filename = filename
 
-            # Chama a função que criamos no usuario.py
             from usuario import Usuario
+            # O bug da ordem dos parâmetros foi resolvido, passando o usuario_id!
             Usuario.atualizar_perfil(usuario_id, nome, email, senha if senha else None, assinatura_filename)
 
-            # Atualiza os dados na "memória" (sessão) para a tela não mostrar dados antigos
             session["usuario"]["nome"] = nome
             session["usuario"]["email"] = email
             if assinatura_filename:
                 session["usuario"]["assinatura"] = assinatura_filename
             session.modified = True
 
-            # Redireciona de volta para a tela de perfil para ver as mudanças
             return redirect(url_for("dashboard"))
 
-        # Se a requisição for GET (Apenas acessando a página)
         return render_template("perfil.html", usuario=session["usuario"])

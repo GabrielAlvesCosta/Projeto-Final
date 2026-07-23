@@ -1,230 +1,379 @@
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, session
+import sqlite3
 from datetime import datetime
-
-# Importa as funções do nosso ficheiro models.py
 from models import get_db, en, de
 
-# Cria um Blueprint (um agrupador de rotas) chamado 'api'
 api = Blueprint('api', __name__)
 
-# ==============================================================
-# API DE USUÁRIOS / PROFISSIONAIS
-# ==============================================================
-@api.route('/usuarios', methods=['GET', 'POST', 'PUT'])
-def api_usuarios():
-    with get_db() as conn:
-        c = conn.cursor()
+# ==========================================
+# ROTAS DE PACIENTES
+# ==========================================
+@api.route('/pacientes', methods=['GET'])
+def get_pacientes():
+    with get_db() as db:
+        db.row_factory = sqlite3.Row
+        rows = db.execute('SELECT * FROM pacientes ORDER BY id DESC').fetchall()
         
-        if request.method == 'POST':
-            d = request.json
-            cpf = d.get('cpf', '').replace('.', '').replace('-', '')
+        pacientes_descriptografados = []
+        for r in rows:
+            p = dict(r)
+            p['nome'] = de(p.get('nome'))
+            p['dataNasc'] = de(p.get('dataNasc'))
+            p['genero'] = de(p.get('genero'))
+            p['documento'] = de(p.get('documento'))
+            p['cartao'] = de(p.get('cartao'))
+            p['contato'] = de(p.get('contato'))
+            pacientes_descriptografados.append(p)
             
-            c.execute("SELECT cpf FROM usuarios WHERE cpf=?", (cpf,))
-            if c.fetchone():
-                return jsonify({"msg": "Profissional já cadastrado com este CPF."}), 400
-                
-            c.execute('''INSERT INTO usuarios (cpf, nome, email, senha, foto) 
-                         VALUES (?, ?, ?, ?, ?)''', 
-                      (cpf, d.get('nome'), d.get('email'), d.get('senha'), d.get('foto', '')))
-            conn.commit()
-            return jsonify({"msg": "Cadastro realizado com sucesso!"}), 201
+        return jsonify(pacientes_descriptografados)
 
-        if request.method == 'PUT':
-            d = request.json
-            cpf = d.get('cpf')
-            c.execute('''UPDATE usuarios SET nome=?, email=?, foto=? WHERE cpf=?''', 
-                      (d.get('nome'), d.get('email'), d.get('foto'), cpf))
-            conn.commit()
-            return jsonify({"msg": "Perfil atualizado!"})
+@api.route('/pacientes', methods=['POST'])
+def post_paciente():
+    data = request.get_json() or {}
+    with get_db() as db:
+        cursor = db.execute('''
+            INSERT INTO pacientes (nome, dataNasc, genero, documento, cartao, contato)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            en(data.get('nome', 'Sem Nome')),
+            en(data.get('dataNasc', '')),
+            en(data.get('genero', 'Não informado')),
+            en(data.get('documento', '')),
+            en(data.get('cartao', '')),
+            en(data.get('contato', ''))
+        ))
+        db.commit()
+        return jsonify({"status": "sucesso", "id": cursor.lastrowid}), 201
 
-        c.execute("SELECT cpf, nome, email, foto FROM usuarios")
-        return jsonify([dict(row) for row in c.fetchall()])
+@api.route('/pacientes', methods=['PUT'])
+def put_paciente():
+    data = request.get_json() or {}
+    with get_db() as db:
+        db.execute('''
+            UPDATE pacientes SET
+                nome=?, dataNasc=?, genero=?, documento=?, cartao=?, contato=?
+            WHERE id=?
+        ''', (
+            en(data.get('nome')), 
+            en(data.get('dataNasc')), 
+            en(data.get('genero')),
+            en(data.get('documento')), 
+            en(data.get('cartao')), 
+            en(data.get('contato')),
+            data.get('id')
+        ))
+        db.commit()
+        return jsonify({"status": "sucesso"}), 200
 
-@api.route('/login', methods=['POST'])
-def api_login():
-    d = request.json
-    cpf = d.get('cpf', '').replace('.', '').replace('-', '')
-    senha = d.get('senha', '')
-
-    with get_db() as conn:
-        c = conn.cursor()
-        c.execute("SELECT * FROM usuarios WHERE cpf=? AND senha=?", (cpf, senha))
-        user = c.fetchone()
+# ==========================================
+# ROTAS DE CONSULTAS
+# ==========================================
+@api.route('/consultas', methods=['GET'])
+def get_consultas():
+    status = request.args.get('status', 'ativas')
+    with get_db() as db:
+        db.row_factory = sqlite3.Row
+        query = '''
+            SELECT c.*, u.nome as profissional
+            FROM consultas c
+            LEFT JOIN usuarios u ON c.crm_coren = u.crm_coren
+        '''
+        if status == 'ativas':
+            query += " WHERE c.status NOT IN ('Atendido', 'Cancelado') ORDER BY c.data ASC, c.horario ASC"
+        else:
+            query += " WHERE c.status IN ('Atendido', 'Cancelado') ORDER BY c.data DESC, c.horario DESC"
+            
+        rows = db.execute(query).fetchall()
         
-        if user:
-            return jsonify({"sucesso": True, "usuario": dict(user)})
-        return jsonify({"sucesso": False, "msg": "Usuário ou senha incorretos."}), 401
+        consultas_descriptografadas = []
+        for r in rows:
+            c = dict(r)
+            c['nomePaciente'] = de(c.get('nomePaciente'))
+            consultas_descriptografadas.append(c)
+            
+        return jsonify(consultas_descriptografadas)
 
-# ==============================================================
-# API DE PACIENTES (COM CRIPTOGRAFIA LGPD)
-# ==============================================================
-@api.route('/pacientes', methods=['GET', 'POST', 'PUT'])
-def api_pacientes():
-    with get_db() as conn:
-        c = conn.cursor()
+@api.route('/consultas', methods=['POST'])
+def post_consulta():
+    data = request.get_json() or {}
+    paciente_id = data.get('pacienteId')
+    crm_coren = data.get('crm_coren')
+
+    if not paciente_id or not crm_coren:
+        return jsonify({"error": "Paciente e Profissional (CRM/COREN) são obrigatórios."}), 400
+
+    try:
+        with get_db() as db:
+            paciente = db.execute('SELECT id FROM pacientes WHERE id = ?', (paciente_id,)).fetchone()
+            if not paciente:
+                return jsonify({"error": "O paciente selecionado não existe no banco de dados."}), 400
+
+            usuario = db.execute('SELECT crm_coren FROM usuarios WHERE crm_coren = ?', (crm_coren,)).fetchone()
+            if not usuario:
+                return jsonify({"error": f"O profissional com CRM/COREN '{crm_coren}' não está cadastrado no sistema."}), 400
+
+            cursor = db.execute('''
+                INSERT INTO consultas (pacienteId, nomePaciente, data, horario, crm_coren, status)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                paciente_id, 
+                en(data.get('nomePaciente')), 
+                data.get('data'),
+                data.get('horario'), 
+                crm_coren, 
+                data.get('status', 'Agendado')
+            ))
+            db.commit()
+            return jsonify({"status": "sucesso", "id": cursor.lastrowid}), 201
+
+    except Exception as e:
+        print(f"Erro ao salvar consulta: {str(e)}")
+        return jsonify({"error": f"Erro interno ao agendar consulta: {str(e)}"}), 500
+
+@api.route('/consultas', methods=['PUT'])
+def put_consulta():
+    data = request.get_json() or {}
+    with get_db() as db:
+        db.execute("UPDATE consultas SET status=? WHERE id=?", (data.get('status'), data.get('id')))
+        db.commit()
+        return jsonify({"status": "sucesso"}), 200
+
+# ==========================================
+# ROTAS DE PRONTUÁRIOS E AUDITORIA
+# ==========================================
+@api.route('/prontuarios', methods=['GET'])
+def get_prontuarios():
+    with get_db() as db:
+        db.row_factory = sqlite3.Row
+        rows = db.execute('SELECT * FROM prontuarios ORDER BY id DESC').fetchall()
         
-        if request.method == 'POST':
-            d = request.json
-            c.execute('''INSERT INTO pacientes (nome, dataNasc, genero, idadeAnos, idadeMeses, idadeDias, documento, cartao, contato)
-                         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)''',
-                      (en(d.get('nome')), en(d.get('dataNasc')), en(d.get('genero')), en(d.get('idadeAnos')), 
-                       en(d.get('idadeMeses')), en(d.get('idadeDias')), en(d.get('documento')), en(d.get('cartao')), en(d.get('contato'))))
-            conn.commit()
-            return jsonify({"msg": "Paciente cadastrado com sucesso", "id": c.lastrowid})
+        prontuarios_descript = []
+        for r in rows:
+            p = dict(r)
+            # Descriptografar todos os campos sensíveis e clínicos
+            p['nomePaciente'] = de(p.get('nomePaciente'))
+            p['dataNascimento'] = de(p.get('dataNascimento'))
+            p['genero'] = de(p.get('genero'))
+            p['documento'] = de(p.get('documento'))
+            p['convenioCartao'] = de(p.get('convenioCartao'))
+            p['contatoPaciente'] = de(p.get('contatoPaciente'))
+            p['acompanhante'] = de(p.get('acompanhante'))
             
-        if request.method == 'PUT':
-            d = request.json
-            c.execute('''UPDATE pacientes SET nome=?, dataNasc=?, genero=?, idadeAnos=?, 
-                         idadeMeses=?, idadeDias=?, documento=?, cartao=?, contato=? WHERE id=?''',
-                      (en(d.get('nome')), en(d.get('dataNasc')), en(d.get('genero')), en(d.get('idadeAnos')), 
-                       en(d.get('idadeMeses')), en(d.get('idadeDias')), en(d.get('documento')), en(d.get('cartao')), en(d.get('contato')), d.get('id')))
-            conn.commit()
-            return jsonify({"msg": "Dados do paciente atualizados"})
+            # Dados Clínicos que o usuário solicitou nas imagens
+            p['especialidade'] = de(p.get('especialidade'))
+            p['tipoAtendimento'] = de(p.get('tipoAtendimento'))
+            p['prioridade'] = de(p.get('prioridade'))
+            p['sinalPA'] = de(p.get('sinalPA'))
+            p['sinalFC'] = de(p.get('sinalFC'))
+            p['sinalFR'] = de(p.get('sinalFR'))
+            p['sinalTEMP'] = de(p.get('sinalTEMP'))
+            p['sinalSATO2'] = de(p.get('sinalSATO2'))
+            p['peso'] = de(p.get('peso'))
+            p['altura'] = de(p.get('altura'))
+            p['estadoGeral'] = de(p.get('estadoGeral'))
+            p['cardioResp'] = de(p.get('cardioResp'))
+            p['neuroOutros'] = de(p.get('neuroOutros'))
             
-        c.execute("SELECT * FROM pacientes ORDER BY id DESC")
-        pacientes = []
-        for row in c.fetchall():
-            p = dict(row)
-            for k in p.keys():
-                if k != 'id': p[k] = de(p[k])
-            pacientes.append(p)
-        return jsonify(pacientes)
-
-# ==============================================================
-# API DE CONSULTAS / AGENDAMENTOS
-# ==============================================================
-@api.route('/consultas', methods=['GET', 'POST', 'PUT'])
-def api_consultas():
-    with get_db() as conn:
-        c = conn.cursor()
-        status_type = request.args.get('status', 'ativas')
-
-        if request.method == 'POST':
-            d = request.json
-            prof = d.get('profissional')
-            data_req = d.get('data')
-            hora_req = d.get('horario')
+            # Histórico e Hipóteses
+            p['qp'] = de(p.get('qp'))
+            p['hda'] = de(p.get('hda'))
+            p['hmp'] = de(p.get('hmp'))
+            p['alergias'] = de(p.get('alergias'))
+            p['hipotese'] = de(p.get('hipotese'))
+            p['conduta'] = de(p.get('conduta'))
+            prontuarios_descript.append(p)
             
-            c.execute("SELECT id FROM consultas WHERE profissional=? AND data=? AND horario=? AND status != 'Cancelado'", 
-                      (prof, data_req, hora_req))
-            if c.fetchone():
-                return jsonify({"error": f"O(a) profissional {prof} já tem um agendamento para {data_req} às {hora_req}."}), 400
+        return jsonify(prontuarios_descript)
+
+@api.route('/prontuarios', methods=['POST'])
+def post_prontuario():
+    data = request.get_json() or {}
+    try:
+        with get_db() as db:
+            usuario_sessao = session.get('usuario', {})
+            crm_coren_logado = usuario_sessao.get('crm_coren') or data.get('crm_coren', 'S/N')
+            nome_profissional = usuario_sessao.get('nome', 'Profissional')
             
-            c.execute('''INSERT INTO consultas (pacienteId, nomePaciente, data, horario, profissional, status)
-                         VALUES (?, ?, ?, ?, ?, ?)''',
-                      (d.get('pacienteId'), en(d.get('nomePaciente')), data_req, hora_req, prof, d.get('status', 'Agendado')))
-            conn.commit()
-            return jsonify({"msg": "Consulta agendada com sucesso"})
+            carimbo_enviado = data.get('carimboAssinatura')
+            carimbo_sessao = usuario_sessao.get('assinatura')
+            assinatura_final = carimbo_enviado if (carimbo_enviado and carimbo_enviado.strip() != '') else (carimbo_sessao or '')
 
-        if request.method == 'PUT':
-            d = request.json
-            c.execute("UPDATE consultas SET status=? WHERE id=?", (d.get('status'), d.get('id')))
-            conn.commit()
-            return jsonify({"msg": "Status da consulta atualizado"})
+            cursor = db.execute('''
+                INSERT INTO prontuarios (
+                    pacienteId, nomePaciente, dataNascimento, genero,
+                    documento, convenioCartao, contatoPaciente, acompanhante, especialidade, tipoAtendimento,
+                    prioridade, qp, hda, hmp, alergias, sinalPA, sinalFC, sinalFR, sinalTEMP, sinalSATO2, peso, altura,
+                    estadoGeral, cardioResp, neuroOutros, hipotese, conduta, crm_coren, registroProfissional, carimboAssinatura
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                data.get('pacienteId'), 
+                en(data.get('nomePaciente')), 
+                en(data.get('dataNascimento')), 
+                en(data.get('genero')),
+                en(data.get('documento')), 
+                en(data.get('convenioCartao')), 
+                en(data.get('contatoPaciente')), 
+                en(data.get('acompanhante')), 
+                en(data.get('especialidade')),
+                en(data.get('tipoAtendimento')), 
+                en(data.get('prioridade')), 
+                en(data.get('qp')), 
+                en(data.get('hda')),
+                en(data.get('hmp')), 
+                en(data.get('alergias')), 
+                en(data.get('sinalPA')), 
+                en(data.get('sinalFC')),
+                en(data.get('sinalFR')), 
+                en(data.get('sinalTEMP')), 
+                en(data.get('sinalSATO2')), 
+                en(data.get('peso')),
+                en(data.get('altura')),
+                en(data.get('estadoGeral')),
+                en(data.get('cardioResp')), 
+                en(data.get('neuroOutros')), 
+                en(data.get('hipotese')), 
+                en(data.get('conduta')),
+                crm_coren_logado, 
+                crm_coren_logado, 
+                assinatura_final
+            ))
+            
+            prontuario_id = cursor.lastrowid
 
-        c.execute("SELECT * FROM consultas")
-        consultas = []
-        for row in c.fetchall():
-            con = dict(row)
-            con['nomePaciente'] = de(con['nomePaciente'])
-            if status_type == 'concluidas':
-                if con['status'] in ['Atendido', 'Cancelado']:
-                    consultas.append(con)
-            else:
-                if con['status'] in ['Agendado', 'Confirmado']:
-                    consultas.append(con)
+            data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            db.execute('''
+                INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                data_hora_atual,
+                nome_profissional,
+                crm_coren_logado,
+                'Criação',
+                prontuario_id,
+                en(data.get('nomePaciente', 'N/A'))
+            ))
 
-        def sort_key(item):
-            try:
-                return datetime.strptime(f"{item['data']}T{item['horario']}", "%Y-%m-%dT%H:%M")
-            except:
-                return datetime.min
+            db.commit()
+            return jsonify({"status": "sucesso", "id": prontuario_id}), 201
 
-        consultas.sort(key=sort_key, reverse=(status_type == 'concluidas'))
-        return jsonify(consultas)
+    except Exception as e:
+        print(f"Erro Crítico ao salvar prontuário: {str(e)}")
+        return jsonify({"error": f"Erro interno no servidor: {str(e)}"}), 500
 
-# ==============================================================
-# API DE PRONTUÁRIOS E AUDITORIA (COM CRIPTOGRAFIA LGPD)
-# ==============================================================
-@api.route('/prontuarios', methods=['GET', 'POST'])
-def api_prontuarios():
-    with get_db() as conn:
-        c = conn.cursor()
+@api.route('/prontuarios/<int:id>', methods=['GET'])
+def get_prontuario_por_id(id):
+    try:
+        with get_db() as db:
+            db.row_factory = sqlite3.Row
+            prontuario_row = db.execute('SELECT * FROM prontuarios WHERE id = ?', (id,)).fetchone()
+            
+            if not prontuario_row:
+                return jsonify({"error": "Prontuário não encontrado"}), 404
+            
+            # Descriptografar o prontuário unitário
+            prontuario = dict(prontuario_row)
+            prontuario['nomePaciente'] = de(prontuario.get('nomePaciente'))
+            prontuario['dataNascimento'] = de(prontuario.get('dataNascimento'))
+            prontuario['genero'] = de(prontuario.get('genero'))
+            prontuario['documento'] = de(prontuario.get('documento'))
+            prontuario['convenioCartao'] = de(prontuario.get('convenioCartao'))
+            prontuario['contatoPaciente'] = de(prontuario.get('contatoPaciente'))
+            prontuario['acompanhante'] = de(prontuario.get('acompanhante'))
+            
+            # Dados Clínicos
+            prontuario['especialidade'] = de(prontuario.get('especialidade'))
+            prontuario['tipoAtendimento'] = de(prontuario.get('tipoAtendimento'))
+            prontuario['prioridade'] = de(prontuario.get('prioridade'))
+            prontuario['sinalPA'] = de(prontuario.get('sinalPA'))
+            prontuario['sinalFC'] = de(prontuario.get('sinalFC'))
+            prontuario['sinalFR'] = de(prontuario.get('sinalFR'))
+            prontuario['sinalTEMP'] = de(prontuario.get('sinalTEMP'))
+            prontuario['sinalSATO2'] = de(prontuario.get('sinalSATO2'))
+            prontuario['peso'] = de(prontuario.get('peso'))
+            prontuario['altura'] = de(prontuario.get('altura'))
+            prontuario['estadoGeral'] = de(prontuario.get('estadoGeral'))
+            prontuario['cardioResp'] = de(prontuario.get('cardioResp'))
+            prontuario['neuroOutros'] = de(prontuario.get('neuroOutros'))
+            
+            # Histórico e Hipóteses
+            prontuario['qp'] = de(prontuario.get('qp'))
+            prontuario['hda'] = de(prontuario.get('hda'))
+            prontuario['hmp'] = de(prontuario.get('hmp'))
+            prontuario['alergias'] = de(prontuario.get('alergias'))
+            prontuario['hipotese'] = de(prontuario.get('hipotese'))
+            prontuario['conduta'] = de(prontuario.get('conduta'))
+            
+            usuario_sessao = session.get('usuario', {})
+            nome_prof = usuario_sessao.get('nome', 'Profissional')
+            crm_logado = usuario_sessao.get('crm_coren', 'N/A')
+            data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+            
+            db.execute('''
+                INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
+                VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                data_hora_atual,
+                nome_prof,
+                crm_logado,
+                'Visualização',
+                id,
+                en(prontuario['nomePaciente'])
+            ))
+            db.commit()
+            
+            return jsonify(prontuario), 200
+
+    except Exception as e:
+        print(f"Erro ao visualizar prontuário: {str(e)}")
+        return jsonify({"error": f"Erro interno: {str(e)}"}), 500
+
+@api.route('/prontuarios/auditoria', methods=['GET'])
+def get_auditoria():
+    with get_db() as db:
+        db.row_factory = sqlite3.Row
+        rows = db.execute('SELECT * FROM auditoria ORDER BY id DESC').fetchall()
         
-        if request.method == 'POST':
-            d = request.json
+        auditoria_descript = []
+        for r in rows:
+            l = dict(r)
+            l['nome_paciente'] = de(l.get('nome_paciente'))
+            auditoria_descript.append(l)
             
-            colunas = [
-                'pacienteId', 'nomePaciente', 'dataNascimento', 'genero', 
-                'idadeAnos', 'idadeMeses', 'idadeDias', 'documento', 
-                'convenioCartao', 'contatoPaciente', 'acompanhante', 'especialidade', 
-                'tipoAtendimento', 'prioridade', 'registroProfissional', 
-                'carimboAssinatura', 'qp', 'hda', 'hmp', 'alergias', 
-                'sinalPA', 'sinalFC', 'sinalFR', 'sinalTEMP', 'sinalSATO2', 
-                'estadoGeral', 'cardioResp', 'neuroOutros', 'hipotese', 
-                'conduta', 'medicoCPF'
-            ]
-            
-            valores = []
-            for col in colunas:
-                if col in ['pacienteId', 'medicoCPF']:
-                    valores.append(d.get(col, ''))
-                else:
-                    valores.append(en(d.get(col, '')))
-                    
-            placeholders = ', '.join(['?'] * len(colunas))
-            colunas_str = ', '.join(colunas)
-            
-            c.execute(f"INSERT INTO prontuarios ({colunas_str}) VALUES ({placeholders})", valores)
-            prontuario_id = c.lastrowid 
-            
-            medico_cpf = d.get('medicoCPF', '')
-            data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-            c.execute("INSERT INTO auditoria_prontuarios (usuario_cpf, prontuario_id, acao, data_hora) VALUES (?, ?, ?, ?)",
-                      (medico_cpf, prontuario_id, 'Criação', data_hora))
-            
-            conn.commit()
-            return jsonify({"msg": "Prontuário salvo com sucesso e Protegido"})
+        return jsonify(auditoria_descript)
 
-        c.execute("SELECT * FROM prontuarios ORDER BY id DESC")
-        prontuarios = []
-        for row in c.fetchall():
-            pr = dict(row)
-            for k in pr.keys():
-                if k not in ['id', 'pacienteId', 'medicoCPF']:
-                    pr[k] = de(pr[k])
-            prontuarios.append(pr)
-        return jsonify(prontuarios)
+@api.route('/prontuarios/auditoria', methods=['POST'])
+def post_auditoria():
+    data = request.get_json() or {}
+    with get_db() as db:
+        data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+        usuario_sessao = session.get('usuario', {})
+        nome_prof = usuario_sessao.get('nome', 'Profissional')
+        crm_logado = usuario_sessao.get('crm_coren', 'N/A')
+        
+        db.execute('''
+            INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            data_hora_atual,
+            nome_prof,
+            data.get('crm_coren', crm_logado),
+            data.get('acao', 'Visualização'),
+            data.get('prontuario_id'),
+            en(data.get('nome_paciente', 'N/A'))
+        ))
+        db.commit()
+        return jsonify({"status": "sucesso"}), 201
 
-@api.route('/prontuarios/auditoria', methods=['GET', 'POST'])
-def api_auditoria():
-    with get_db() as conn:
-        c = conn.cursor()
-        
-        if request.method == 'POST':
-            d = request.json
-            usuario_cpf = d.get('usuario_cpf')
-            prontuario_id = d.get('prontuario_id')
-            acao = d.get('acao', 'Visualização')
-            data_hora = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
+@api.route('/usuarios', methods=['GET'])
+def get_usuarios():
+    try:
+        with get_db() as db:
+            db.row_factory = sqlite3.Row
+            rows = db.execute('SELECT * FROM usuarios').fetchall()
+            return jsonify([dict(r) for r in rows])
             
-            c.execute("INSERT INTO auditoria_prontuarios (usuario_cpf, prontuario_id, acao, data_hora) VALUES (?, ?, ?, ?)",
-                      (usuario_cpf, prontuario_id, acao, data_hora))
-            conn.commit()
-            return jsonify({"msg": "Log de auditoria registrado."})
-        
-        c.execute('''
-            SELECT a.id, a.data_hora, a.acao, a.usuario_cpf, a.prontuario_id,
-                   u.nome as nome_profissional, p.nomePaciente as nome_paciente
-            FROM auditoria_prontuarios a
-            LEFT JOIN usuarios u ON a.usuario_cpf = u.cpf
-            LEFT JOIN prontuarios p ON a.prontuario_id = p.id
-            ORDER BY a.id DESC
-        ''')
-        
-        logs = []
-        for row in c.fetchall():
-            l = dict(row)
-            l['nome_paciente'] = de(l['nome_paciente'])
-            logs.append(l)
-        return jsonify(logs)
+    except Exception as e:
+        print(f"Erro ao buscar usuários: {e}")
+        if "usuario" in session:
+            return jsonify([session["usuario"]])
+        return jsonify([])
