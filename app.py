@@ -1,9 +1,8 @@
 from flask import Flask, render_template, session, redirect, url_for, request
 import sqlite3
-from models import init_db
+from models import init_db, get_db, en, de
 from controllers import api
 from auth_controller import AuthController
-from models import get_db
 
 app = Flask(__name__, static_folder='Static') 
 app.secret_key = "chave_mestra_clinical_pep"
@@ -40,17 +39,30 @@ def dashboard():
     if "usuario" not in session:
         return redirect(url_for("login"))
         
-    from models import get_db
-    pacientes_lista = []
+    pacientes_descriptografados = []
     
     try:
         with get_db() as db:
             db.row_factory = sqlite3.Row
-            pacientes_lista = db.execute('SELECT * FROM pacientes ORDER BY nome ASC').fetchall()
-    except Exception:
-        pass
+            pacientes_db = db.execute('SELECT * FROM pacientes ORDER BY id DESC').fetchall()
+            
+            # Descriptografa os pacientes para exibição no Dashboard HTML
+            for p in pacientes_db:
+                p_dict = dict(p)
+                p_dict['nome'] = de(p_dict.get('nome'))
+                p_dict['dataNasc'] = de(p_dict.get('dataNasc'))
+                p_dict['genero'] = de(p_dict.get('genero'))
+                p_dict['documento'] = de(p_dict.get('documento'))
+                p_dict['cartao'] = de(p_dict.get('cartao'))
+                p_dict['contato'] = de(p_dict.get('contato'))
+                pacientes_descriptografados.append(p_dict)
+                
+            # Opcional: Reordenar alfabeticamente após descriptografar
+            pacientes_descriptografados = sorted(pacientes_descriptografados, key=lambda k: (k['nome'] or '').lower())
+    except Exception as e:
+        print(f"Erro ao carregar dashboard: {e}")
         
-    return render_template("dashboard.html", usuario=session["usuario"], pacientes=pacientes_lista)
+    return render_template("dashboard.html", usuario=session["usuario"], pacientes=pacientes_descriptografados)
 
 @app.route("/usuarios")
 def usuarios():
@@ -97,24 +109,19 @@ def cadastrar_paciente():
     cartao = request.form.get("cartao", "Não informado").strip()
     contato = request.form.get("contato", "Não informado").strip()
     
-    
     with get_db() as db:
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS pacientes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                dataNasc TEXT NOT NULL,
-                genero TEXT NOT NULL,
-                documento TEXT NOT NULL,
-                cartao TEXT NOT NULL,
-                contato TEXT NOT NULL
-            )
-        ''')
-        
+        # Criptografa os dados sensíveis antes de salvar no banco de dados
         db.execute('''
             INSERT INTO pacientes (nome, dataNasc, genero, documento, cartao, contato)
             VALUES (?, ?, ?, ?, ?, ?)
-        ''', (nome, data_nasc_formatada, genero, documento, cartao, contato))
+        ''', (
+            en(nome), 
+            en(data_nasc_formatada), 
+            en(genero), 
+            en(documento), 
+            en(cartao), 
+            en(contato)
+        ))
         db.commit()
     
     return redirect(url_for("dashboard"))

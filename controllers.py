@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, session
 import sqlite3
 from datetime import datetime
-from models import get_db
+from models import get_db, en, de
 
 api = Blueprint('api', __name__)
 
@@ -13,33 +13,34 @@ def get_pacientes():
     with get_db() as db:
         db.row_factory = sqlite3.Row
         rows = db.execute('SELECT * FROM pacientes ORDER BY id DESC').fetchall()
-        return jsonify([dict(r) for r in rows])
+        
+        pacientes_descriptografados = []
+        for r in rows:
+            p = dict(r)
+            p['nome'] = de(p.get('nome'))
+            p['dataNasc'] = de(p.get('dataNasc'))
+            p['genero'] = de(p.get('genero'))
+            p['documento'] = de(p.get('documento'))
+            p['cartao'] = de(p.get('cartao'))
+            p['contato'] = de(p.get('contato'))
+            pacientes_descriptografados.append(p)
+            
+        return jsonify(pacientes_descriptografados)
 
 @api.route('/pacientes', methods=['POST'])
 def post_paciente():
     data = request.get_json() or {}
     with get_db() as db:
-        db.execute('''
-            CREATE TABLE IF NOT EXISTS pacientes (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                nome TEXT NOT NULL,
-                dataNasc TEXT,
-                genero TEXT,
-                documento TEXT,
-                cartao TEXT,
-                contato TEXT
-            )
-        ''')
         cursor = db.execute('''
             INSERT INTO pacientes (nome, dataNasc, genero, documento, cartao, contato)
             VALUES (?, ?, ?, ?, ?, ?)
         ''', (
-            data.get('nome', 'Sem Nome'),
-            data.get('dataNasc', ''),
-            data.get('genero', 'Não informado'),
-            data.get('documento', ''),
-            data.get('cartao', ''),
-            data.get('contato', '')
+            en(data.get('nome', 'Sem Nome')),
+            en(data.get('dataNasc', '')),
+            en(data.get('genero', 'Não informado')),
+            en(data.get('documento', '')),
+            en(data.get('cartao', '')),
+            en(data.get('contato', ''))
         ))
         db.commit()
         return jsonify({"status": "sucesso", "id": cursor.lastrowid}), 201
@@ -53,8 +54,12 @@ def put_paciente():
                 nome=?, dataNasc=?, genero=?, documento=?, cartao=?, contato=?
             WHERE id=?
         ''', (
-            data.get('nome'), data.get('dataNasc'), data.get('genero'),
-            data.get('documento'), data.get('cartao'), data.get('contato'),
+            en(data.get('nome')), 
+            en(data.get('dataNasc')), 
+            en(data.get('genero')),
+            en(data.get('documento')), 
+            en(data.get('cartao')), 
+            en(data.get('contato')),
             data.get('id')
         ))
         db.commit()
@@ -68,21 +73,25 @@ def get_consultas():
     status = request.args.get('status', 'ativas')
     with get_db() as db:
         db.row_factory = sqlite3.Row
-        
-        # Utilizamos LEFT JOIN para buscar o nome do médico baseado no crm_coren
         query = '''
             SELECT c.*, u.nome as profissional
             FROM consultas c
             LEFT JOIN usuarios u ON c.crm_coren = u.crm_coren
         '''
-        
         if status == 'ativas':
             query += " WHERE c.status NOT IN ('Atendido', 'Cancelado') ORDER BY c.data ASC, c.horario ASC"
         else:
             query += " WHERE c.status IN ('Atendido', 'Cancelado') ORDER BY c.data DESC, c.horario DESC"
             
         rows = db.execute(query).fetchall()
-        return jsonify([dict(r) for r in rows])
+        
+        consultas_descriptografadas = []
+        for r in rows:
+            c = dict(r)
+            c['nomePaciente'] = de(c.get('nomePaciente'))
+            consultas_descriptografadas.append(c)
+            
+        return jsonify(consultas_descriptografadas)
 
 @api.route('/consultas', methods=['POST'])
 def post_consulta():
@@ -95,23 +104,20 @@ def post_consulta():
 
     try:
         with get_db() as db:
-            # Valida se o paciente existe
             paciente = db.execute('SELECT id FROM pacientes WHERE id = ?', (paciente_id,)).fetchone()
             if not paciente:
                 return jsonify({"error": "O paciente selecionado não existe no banco de dados."}), 400
 
-            # Valida se o usuario/profissional existe
             usuario = db.execute('SELECT crm_coren FROM usuarios WHERE crm_coren = ?', (crm_coren,)).fetchone()
             if not usuario:
                 return jsonify({"error": f"O profissional com CRM/COREN '{crm_coren}' não está cadastrado no sistema."}), 400
 
-            # Insere a consulta com segurança
             cursor = db.execute('''
                 INSERT INTO consultas (pacienteId, nomePaciente, data, horario, crm_coren, status)
                 VALUES (?, ?, ?, ?, ?, ?)
             ''', (
                 paciente_id, 
-                data.get('nomePaciente'), 
+                en(data.get('nomePaciente')), 
                 data.get('data'),
                 data.get('horario'), 
                 crm_coren, 
@@ -140,44 +146,100 @@ def get_prontuarios():
     with get_db() as db:
         db.row_factory = sqlite3.Row
         rows = db.execute('SELECT * FROM prontuarios ORDER BY id DESC').fetchall()
-        return jsonify([dict(r) for r in rows])
+        
+        prontuarios_descript = []
+        for r in rows:
+            p = dict(r)
+            # Descriptografar todos os campos sensíveis e clínicos
+            p['nomePaciente'] = de(p.get('nomePaciente'))
+            p['dataNascimento'] = de(p.get('dataNascimento'))
+            p['genero'] = de(p.get('genero'))
+            p['documento'] = de(p.get('documento'))
+            p['convenioCartao'] = de(p.get('convenioCartao'))
+            p['contatoPaciente'] = de(p.get('contatoPaciente'))
+            p['acompanhante'] = de(p.get('acompanhante'))
+            
+            # Dados Clínicos que o usuário solicitou nas imagens
+            p['especialidade'] = de(p.get('especialidade'))
+            p['tipoAtendimento'] = de(p.get('tipoAtendimento'))
+            p['prioridade'] = de(p.get('prioridade'))
+            p['sinalPA'] = de(p.get('sinalPA'))
+            p['sinalFC'] = de(p.get('sinalFC'))
+            p['sinalFR'] = de(p.get('sinalFR'))
+            p['sinalTEMP'] = de(p.get('sinalTEMP'))
+            p['sinalSATO2'] = de(p.get('sinalSATO2'))
+            p['peso'] = de(p.get('peso'))
+            p['altura'] = de(p.get('altura'))
+            p['estadoGeral'] = de(p.get('estadoGeral'))
+            p['cardioResp'] = de(p.get('cardioResp'))
+            p['neuroOutros'] = de(p.get('neuroOutros'))
+            
+            # Histórico e Hipóteses
+            p['qp'] = de(p.get('qp'))
+            p['hda'] = de(p.get('hda'))
+            p['hmp'] = de(p.get('hmp'))
+            p['alergias'] = de(p.get('alergias'))
+            p['hipotese'] = de(p.get('hipotese'))
+            p['conduta'] = de(p.get('conduta'))
+            prontuarios_descript.append(p)
+            
+        return jsonify(prontuarios_descript)
 
 @api.route('/prontuarios', methods=['POST'])
 def post_prontuario():
     data = request.get_json() or {}
     try:
         with get_db() as db:
-            # 1. Captura os dados da sessão
             usuario_sessao = session.get('usuario', {})
             crm_coren_logado = usuario_sessao.get('crm_coren') or data.get('crm_coren', 'S/N')
             nome_profissional = usuario_sessao.get('nome', 'Profissional')
             
-            # CORREÇÃO: Prioriza a imagem enviada via JSON; se vazia, pega da sessão
             carimbo_enviado = data.get('carimboAssinatura')
             carimbo_sessao = usuario_sessao.get('assinatura')
             assinatura_final = carimbo_enviado if (carimbo_enviado and carimbo_enviado.strip() != '') else (carimbo_sessao or '')
 
-            # 2. Insere o Prontuário Clínico
             cursor = db.execute('''
                 INSERT INTO prontuarios (
                     pacienteId, nomePaciente, dataNascimento, genero,
                     documento, convenioCartao, contatoPaciente, acompanhante, especialidade, tipoAtendimento,
-                    prioridade, qp, hda, hmp, alergias, sinalPA, sinalFC, sinalFR, sinalTEMP, sinalSATO2,
+                    prioridade, qp, hda, hmp, alergias, sinalPA, sinalFC, sinalFR, sinalTEMP, sinalSATO2, peso, altura,
                     estadoGeral, cardioResp, neuroOutros, hipotese, conduta, crm_coren, registroProfissional, carimboAssinatura
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             ''', (
-                data.get('pacienteId'), data.get('nomePaciente'), data.get('dataNascimento'), data.get('genero'),
-                data.get('documento'), data.get('convenioCartao'), data.get('contatoPaciente'), data.get('acompanhante'), data.get('especialidade'),
-                data.get('tipoAtendimento'), data.get('prioridade'), data.get('qp'), data.get('hda'),
-                data.get('hmp'), data.get('alergias'), data.get('sinalPA'), data.get('sinalFC'),
-                data.get('sinalFR'), data.get('sinalTEMP'), data.get('sinalSATO2'), data.get('estadoGeral'),
-                data.get('cardioResp'), data.get('neuroOutros'), data.get('hipotese'), data.get('conduta'),
-                crm_coren_logado, crm_coren_logado, assinatura_final
+                data.get('pacienteId'), 
+                en(data.get('nomePaciente')), 
+                en(data.get('dataNascimento')), 
+                en(data.get('genero')),
+                en(data.get('documento')), 
+                en(data.get('convenioCartao')), 
+                en(data.get('contatoPaciente')), 
+                en(data.get('acompanhante')), 
+                en(data.get('especialidade')),
+                en(data.get('tipoAtendimento')), 
+                en(data.get('prioridade')), 
+                en(data.get('qp')), 
+                en(data.get('hda')),
+                en(data.get('hmp')), 
+                en(data.get('alergias')), 
+                en(data.get('sinalPA')), 
+                en(data.get('sinalFC')),
+                en(data.get('sinalFR')), 
+                en(data.get('sinalTEMP')), 
+                en(data.get('sinalSATO2')), 
+                en(data.get('peso')),
+                en(data.get('altura')),
+                en(data.get('estadoGeral')),
+                en(data.get('cardioResp')), 
+                en(data.get('neuroOutros')), 
+                en(data.get('hipotese')), 
+                en(data.get('conduta')),
+                crm_coren_logado, 
+                crm_coren_logado, 
+                assinatura_final
             ))
             
             prontuario_id = cursor.lastrowid
 
-            # 3. Grava Log na Auditoria
             data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             db.execute('''
                 INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
@@ -188,7 +250,7 @@ def post_prontuario():
                 crm_coren_logado,
                 'Criação',
                 prontuario_id,
-                data.get('nomePaciente', 'N/A')
+                en(data.get('nomePaciente', 'N/A'))
             ))
 
             db.commit()
@@ -203,19 +265,49 @@ def get_prontuario_por_id(id):
     try:
         with get_db() as db:
             db.row_factory = sqlite3.Row
-            # 1. Busca o prontuário no banco
-            prontuario = db.execute('SELECT * FROM prontuarios WHERE id = ?', (id,)).fetchone()
+            prontuario_row = db.execute('SELECT * FROM prontuarios WHERE id = ?', (id,)).fetchone()
             
-            if not prontuario:
+            if not prontuario_row:
                 return jsonify({"error": "Prontuário não encontrado"}), 404
             
-            # 2. Captura os dados do usuário logado na sessão
+            # Descriptografar o prontuário unitário
+            prontuario = dict(prontuario_row)
+            prontuario['nomePaciente'] = de(prontuario.get('nomePaciente'))
+            prontuario['dataNascimento'] = de(prontuario.get('dataNascimento'))
+            prontuario['genero'] = de(prontuario.get('genero'))
+            prontuario['documento'] = de(prontuario.get('documento'))
+            prontuario['convenioCartao'] = de(prontuario.get('convenioCartao'))
+            prontuario['contatoPaciente'] = de(prontuario.get('contatoPaciente'))
+            prontuario['acompanhante'] = de(prontuario.get('acompanhante'))
+            
+            # Dados Clínicos
+            prontuario['especialidade'] = de(prontuario.get('especialidade'))
+            prontuario['tipoAtendimento'] = de(prontuario.get('tipoAtendimento'))
+            prontuario['prioridade'] = de(prontuario.get('prioridade'))
+            prontuario['sinalPA'] = de(prontuario.get('sinalPA'))
+            prontuario['sinalFC'] = de(prontuario.get('sinalFC'))
+            prontuario['sinalFR'] = de(prontuario.get('sinalFR'))
+            prontuario['sinalTEMP'] = de(prontuario.get('sinalTEMP'))
+            prontuario['sinalSATO2'] = de(prontuario.get('sinalSATO2'))
+            prontuario['peso'] = de(prontuario.get('peso'))
+            prontuario['altura'] = de(prontuario.get('altura'))
+            prontuario['estadoGeral'] = de(prontuario.get('estadoGeral'))
+            prontuario['cardioResp'] = de(prontuario.get('cardioResp'))
+            prontuario['neuroOutros'] = de(prontuario.get('neuroOutros'))
+            
+            # Histórico e Hipóteses
+            prontuario['qp'] = de(prontuario.get('qp'))
+            prontuario['hda'] = de(prontuario.get('hda'))
+            prontuario['hmp'] = de(prontuario.get('hmp'))
+            prontuario['alergias'] = de(prontuario.get('alergias'))
+            prontuario['hipotese'] = de(prontuario.get('hipotese'))
+            prontuario['conduta'] = de(prontuario.get('conduta'))
+            
             usuario_sessao = session.get('usuario', {})
             nome_prof = usuario_sessao.get('nome', 'Profissional')
             crm_logado = usuario_sessao.get('crm_coren', 'N/A')
             data_hora_atual = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
             
-            # 3. GRAVA AUTOMATICAMENTE A VISUALIZAÇÃO NA TABELA AUDITORIA
             db.execute('''
                 INSERT INTO auditoria (data_hora, nome_profissional, crm_coren, acao, prontuario_id, nome_paciente)
                 VALUES (?, ?, ?, ?, ?, ?)
@@ -225,11 +317,11 @@ def get_prontuario_por_id(id):
                 crm_logado,
                 'Visualização',
                 id,
-                prontuario['nomePaciente']
+                en(prontuario['nomePaciente'])
             ))
             db.commit()
             
-            return jsonify(dict(prontuario)), 200
+            return jsonify(prontuario), 200
 
     except Exception as e:
         print(f"Erro ao visualizar prontuário: {str(e)}")
@@ -240,7 +332,14 @@ def get_auditoria():
     with get_db() as db:
         db.row_factory = sqlite3.Row
         rows = db.execute('SELECT * FROM auditoria ORDER BY id DESC').fetchall()
-        return jsonify([dict(r) for r in rows])
+        
+        auditoria_descript = []
+        for r in rows:
+            l = dict(r)
+            l['nome_paciente'] = de(l.get('nome_paciente'))
+            auditoria_descript.append(l)
+            
+        return jsonify(auditoria_descript)
 
 @api.route('/prontuarios/auditoria', methods=['POST'])
 def post_auditoria():
@@ -260,7 +359,7 @@ def post_auditoria():
             data.get('crm_coren', crm_logado),
             data.get('acao', 'Visualização'),
             data.get('prontuario_id'),
-            data.get('nome_paciente', 'N/A')
+            en(data.get('nome_paciente', 'N/A'))
         ))
         db.commit()
         return jsonify({"status": "sucesso"}), 201
@@ -270,13 +369,11 @@ def get_usuarios():
     try:
         with get_db() as db:
             db.row_factory = sqlite3.Row
-            # Seleciona todos os usuários cadastrados
             rows = db.execute('SELECT * FROM usuarios').fetchall()
             return jsonify([dict(r) for r in rows])
             
     except Exception as e:
         print(f"Erro ao buscar usuários: {e}")
-        # FALLBACK: Se der erro no banco, retorna pelo menos o próprio usuário logado para o Select não ficar vazio
         if "usuario" in session:
             return jsonify([session["usuario"]])
         return jsonify([])

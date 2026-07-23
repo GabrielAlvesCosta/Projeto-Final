@@ -442,13 +442,21 @@
                                     <label class="form-label small fw-bold">F.R. (rpm)</label>
                                     <input type="text" id="prontuarioFR" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
                                 </div>
-                                <div class="col-md-3">
-                                    <label class="form-label small fw-bold">Temp. Corporal (°C)</label>
-                                    <input type="text" id="prontuarioTEMP" class="form-control" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" placeholder="Ex: 36.5" required>
+                                <div class="col-md-2">
+                                    <label class="form-label small fw-bold">Temp. (°C)</label>
+                                    <input type="text" id="prontuarioTEMP" class="form-control" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" placeholder="36.5" required>
                                 </div>
-                                <div class="col-md-3">
+                                <div class="col-md-2">
                                     <label class="form-label small fw-bold">SatO₂ (%)</label>
                                     <input type="text" id="prontuarioSATO2" class="form-control" inputmode="numeric" oninput="this.value = this.value.replace(/[^0-9]/g, '')" required>
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small fw-bold">Peso (kg)</label>
+                                    <input type="text" id="prontuarioPeso" class="form-control" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" placeholder="Ex: 75.5">
+                                </div>
+                                <div class="col-md-2">
+                                    <label class="form-label small fw-bold">Altura (m)</label>
+                                    <input type="text" id="prontuarioAltura" class="form-control" oninput="this.value = this.value.replace(/[^0-9.,]/g, '')" placeholder="Ex: 1.75">
                                 </div>
 
                                 <div class="col-12"><hr><h5 class="text-secondary">Anamnese e Exame Clínico</h5></div>
@@ -633,6 +641,8 @@
                                     <strong>F.R.:</strong> <input type="text" id="editProntuarioFR" class="form-control form-control-sm my-1" disabled>
                                     <strong>Temp:</strong> <input type="text" id="editProntuarioTEMP" class="form-control form-control-sm my-1" disabled>
                                     <strong>SatO₂:</strong> <input type="text" id="editProntuarioSATO2" class="form-control form-control-sm my-1" disabled>
+                                    <strong>Peso(kg):</strong> <input type="text" id="editProntuarioPeso" class="form-control form-control-sm my-1" disabled>
+                                    <strong>Altura(m):</strong> <input type="text" id="editProntuarioAltura" class="form-control form-control-sm my-1" disabled>
                                 </div>
                             </div>
                         </div>

@@ -375,6 +375,23 @@ async function agendarConsulta(event) {
             return alert("Erro crítico: Não é possível agendar uma consulta para uma data ou horário que já passou!");
         }
 
+        // ----------------------------------------------------------------
+        // VALIDAÇÃO: Bloqueia agendamento duplicado para o mesmo profissional
+        // ----------------------------------------------------------------
+        const resConsultasAtivas = await fetch('/api/consultas?status=ativas');
+        if (resConsultasAtivas.ok) {
+            const consultasAtivas = await resConsultasAtivas.json();
+            const conflito = consultasAtivas.find(c => 
+                (c.crm_coren === profissionalInput || c.profissional === profissionalInput) &&
+                c.data === dataInput &&
+                c.horario === horarioInput
+            );
+
+            if (conflito) {
+                return alert("Horário indisponível! Este profissional já possui uma consulta agendada para essa mesma data e horário.");
+            }
+        }
+
         const btnSubmit = document.querySelector('#formNovaConsulta button[type="submit"]');
         if (btnSubmit) {
             if (btnSubmit.disabled) return;
@@ -728,6 +745,8 @@ async function publicarProntuario(event) {
             sinalFR: getVal('prontuarioFR'),
             sinalTEMP: getVal('prontuarioTEMP'),
             sinalSATO2: getVal('prontuarioSATO2'),
+            peso: getVal('prontuarioPeso'),
+            altura: getVal('prontuarioAltura'),
             estadoGeral: getVal('prontuarioEstadoGeral'),
             cardioResp: getVal('prontuarioCardioResp'),
             neuroOutros: getVal('prontuarioNeuroOutros'),
@@ -865,6 +884,8 @@ async function abrirProntuario(id) {
         setVal('editProntuarioFR', prontuario.sinalFR);
         setVal('editProntuarioTEMP', prontuario.sinalTEMP);
         setVal('editProntuarioSATO2', prontuario.sinalSATO2);
+        setVal('editProntuarioPeso', prontuario.peso);
+        setVal('editProntuarioAltura', prontuario.altura);
         setVal('editProntuarioEstadoGeral', prontuario.estadoGeral);
         setVal('editProntuarioCardio', prontuario.cardioResp);
         setVal('editProntuarioNeuro', prontuario.neuroOutros);

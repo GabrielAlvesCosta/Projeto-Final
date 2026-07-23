@@ -80,6 +80,7 @@ def init_db():
                 especialidade TEXT, tipoAtendimento TEXT, prioridade TEXT,
                 registroProfissional TEXT, carimboAssinatura TEXT, qp TEXT, hda TEXT, hmp TEXT, alergias TEXT,
                 sinalPA TEXT, sinalFC TEXT, sinalFR TEXT, sinalTEMP TEXT, sinalSATO2 TEXT,
+                peso TEXT, altura TEXT,
                 estadoGeral TEXT, cardioResp TEXT, neuroOutros TEXT, hipotese TEXT, conduta TEXT,
                 crm_coren TEXT,
                 FOREIGN KEY (pacienteId) REFERENCES pacientes(id),
