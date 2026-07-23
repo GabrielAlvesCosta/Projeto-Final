@@ -16,7 +16,6 @@ with open(KEY_FILE, 'rb') as f:
 cipher = Fernet(FERNET_KEY)
 HMAC_KEY = hashlib.sha256(FERNET_KEY).digest()
 
-# Funções de normalização e Criptografia
 def normalize_sensitive(value):
     if value is None:
         return ''
@@ -29,13 +28,17 @@ def crm_coren_tag(value):
     return hmac.new(HMAC_KEY, normalized.encode('utf-8'), hashlib.sha256).hexdigest()
 
 def en(value):
-    if value is None or str(value).strip() == '': return value
+    if value is None or str(value).strip() == '':
+        return value
     return cipher.encrypt(str(value).encode('utf-8')).decode('utf-8')
 
 def de(value):
-    if value is None or str(value).strip() == '': return value
-    try: return cipher.decrypt(str(value).encode('utf-8')).decode('utf-8')
-    except: return value
+    if value is None or str(value).strip() == '':
+        return value
+    try:
+        return cipher.decrypt(str(value).encode('utf-8')).decode('utf-8')
+    except:
+        return value
 
 DB_FILE = 'clinica.db'
 
@@ -63,6 +66,27 @@ def init_db():
                 assinatura TEXT DEFAULT ''
             )
         ''')
+        # Garante que o campo de tag sensível existe em bancos antigos e que a coluna é exclusiva
+        c.execute('PRAGMA table_info(usuarios)')
+        existing_columns = [row[1] for row in c.fetchall()]
+        if 'crm_coren_tag' not in existing_columns:
+            c.execute('ALTER TABLE usuarios ADD COLUMN crm_coren_tag TEXT')
+        c.execute('CREATE UNIQUE INDEX IF NOT EXISTS idx_usuarios_crm_coren_tag ON usuarios(crm_coren_tag)')
+
+        # Migra dados antigos: criptografa CRM/COREN em texto claro e preenche a tag determinística
+        c.execute('SELECT id, crm_coren FROM usuarios')
+        for usuario_id, crm_val in c.fetchall():
+            if crm_val is None or str(crm_val).strip() == '':
+                continue
+            raw = str(crm_val).strip()
+            try:
+                raw_decrypted = cipher.decrypt(raw.encode('utf-8')).decode('utf-8')
+            except Exception:
+                raw_decrypted = raw
+                c.execute('UPDATE usuarios SET crm_coren = ? WHERE id = ?', (en(raw_decrypted), usuario_id))
+            tag = crm_coren_tag(raw_decrypted)
+            if tag:
+                c.execute('UPDATE usuarios SET crm_coren_tag = ? WHERE id = ?', (tag, usuario_id))
         
         # Garante que o campo de tag sensível existe e faz a migração dos dados se necessário
         c.execute('PRAGMA table_info(usuarios)')

@@ -29,16 +29,12 @@ class AuthController:
 
             if crm_coren and Usuario.crm_coren_existe(crm_coren):
                 return render_template("cadastro.html", error="CRM/COREN já cadastrado")
-
-            # Upload da Assinatura Digital Criptografada
             file = request.files.get("assinatura")
             assinatura_filename = ""
             if file and file.filename != "":
                 filename = f"{int(time.time())}_{secure_filename(file.filename)}"
                 upload_path = os.path.join("static", "uploads")
                 os.makedirs(upload_path, exist_ok=True)
-                
-                # Lê os dados da imagem e criptografa antes de salvar
                 data = file.read()
                 encrypted_data = cipher.encrypt(data)
                 with open(os.path.join(upload_path, filename), "wb") as f:
@@ -72,8 +68,9 @@ class AuthController:
 
             usuario = Usuario.autenticar(email, senha)
             if usuario:
+              
                 session.permanent = True
-                # Tratamento robusto para suportar dicionários/Row ou tuplas do banco
+
                 try:
                     dados_sessao = {
                         "id": usuario["id"],
@@ -161,7 +158,6 @@ class AuthController:
             filename = f"{int(time.time())}_{secure_filename(file.filename)}"
             upload_path = os.path.join("static", "uploads")
             os.makedirs(upload_path, exist_ok=True)
-            
             data = file.read()
             encrypted_data = cipher.encrypt(data)
             with open(os.path.join(upload_path, filename), "wb") as f:
@@ -189,7 +185,6 @@ class AuthController:
                 filename = f"{int(time.time())}_{secure_filename(file.filename)}"
                 upload_path = os.path.join("static", "uploads")
                 os.makedirs(upload_path, exist_ok=True)
-                
                 data = file.read()
                 encrypted_data = cipher.encrypt(data)
                 with open(os.path.join(upload_path, filename), "wb") as f:

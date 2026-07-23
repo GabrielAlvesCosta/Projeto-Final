@@ -4,7 +4,6 @@ import mimetypes
 from datetime import timedelta
 from flask import Flask, render_template, session, redirect, url_for, request, Response
 from werkzeug.utils import secure_filename
-
 # Combinação das importações necessárias das duas versões
 from models import init_db, get_db, cipher, en, de
 from controllers import api
@@ -14,6 +13,12 @@ from auth_controller import AuthController
 app = Flask(__name__, static_folder='static') 
 app.secret_key = "chave_mestra_clinical_pep"
 
+# Configurações de segurança de sessão da versão remota
+app.config.update({
+    'SESSION_COOKIE_HTTPONLY': True,
+    'SESSION_COOKIE_SAMESITE': 'Lax',
+    'PERMANENT_SESSION_LIFETIME': timedelta(minutes=30)
+})
 # Adicionado as configurações de segurança de sessão da versão remota
 app.config.update({
     'SESSION_COOKIE_HTTPONLY': True,
@@ -90,12 +95,22 @@ def admin():
         return render_template("403.html"), 403
     return AuthController.usuarios()
 
+def is_admin():
+    return "usuario" in session and str(session["usuario"].get("admin", "nao")).strip().lower() == "sim"
+
+@app.route("/admin")
+def admin():
+    if "usuario" not in session:
+        return redirect(url_for("login"))
+    if not is_admin():
+        return render_template("403.html"), 403
+    return AuthController.usuarios()
+
 @app.route("/usuarios")
 def usuarios():
     if "usuario" not in session:
         return redirect(url_for("login"))
     
-    # Utilizando o helper is_admin e retornando erro 403 apropriado
     if not is_admin():
         return render_template("403.html"), 403
         
@@ -109,7 +124,6 @@ def editar_usuario(id):
         return render_template("403.html"), 403
     return AuthController.editar_usuario_post(id)
 
-# Rota de visualização segura de assinaturas da versão remota
 @app.route('/assinatura/<path:filename>')
 def assinatura(filename):
     if "usuario" not in session:
@@ -120,8 +134,7 @@ def assinatura(filename):
         return render_template("403.html"), 403
 
     secure_name = secure_filename(filename)
-    # Aqui ajustamos para 'static' em minúsculo para manter consistência com sua correção
-    file_path = os.path.join("static", "uploads", secure_name)
+file_path = os.path.join("static", "uploads", secure_name)
     if not os.path.isfile(file_path):
         return "Arquivo não encontrado", 404
 
@@ -183,10 +196,10 @@ def cadastrar_paciente():
     return redirect(url_for("dashboard"))
 
 if __name__ == '__main__':
-    # Mantido o try/except para falhas de porta
+# Mantido o try/except para falhas de porta
     try:
         app.run(debug=True, use_reloader=False, port=5000)
     except OSError as ex:
         print('Falha ao iniciar em 5000. Detalhes:', ex)
         print('Tentando iniciar em 5001...')
-        app.run(debug=True, use_reloader=False, port=5001)  
+        app.run(debug=True, use_reloader=False, port=5001)

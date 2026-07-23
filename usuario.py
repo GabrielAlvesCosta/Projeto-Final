@@ -1,4 +1,4 @@
-from models import get_db
+from models import get_db, en, de, crm_coren_tag
 from werkzeug.security import generate_password_hash, check_password_hash
 
 class Usuario:
@@ -13,49 +13,52 @@ class Usuario:
 
     def salvar(self):
         hashed_senha = generate_password_hash(self.senha)
+        encrypted_crm = en(self.crm_coren)
+        crm_tag = crm_coren_tag(self.crm_coren)
         with get_db() as conexao:
             conexao.execute(
                 """
-                INSERT INTO usuarios (nome, email, cargo, crm_coren, senha, admin, assinatura)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO usuarios (nome, email, cargo, crm_coren, crm_coren_tag, senha, admin, assinatura)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                (self.nome, self.email, self.cargo, self.crm_coren, hashed_senha, self.admin, self.assinatura)
+                (self.nome, self.email, self.cargo, encrypted_crm, crm_tag, hashed_senha, self.admin, self.assinatura)
             )
             conexao.commit()
     
     @staticmethod
     def atualizar_perfil(usuario_id, nome, email, senha=None, assinatura_filename=None):
-        # CORREÇÃO: Importamos a conexão correta do nosso models unificado
         from models import get_db 
         
-        # Começamos atualizando apenas o básico
         query = "UPDATE usuarios SET nome = ?, email = ?"
         params = [nome, email]
 
-        # Se o usuário digitou uma senha nova, nós a criptografamos e adicionamos na query
         if senha:
             from werkzeug.security import generate_password_hash
             query += ", senha = ?"
             params.append(generate_password_hash(senha))
 
-        # Se o usuário enviou um novo arquivo de assinatura, atualizamos a foto
         if assinatura_filename:
             query += ", assinatura = ?"
             params.append(assinatura_filename)
             
-        # Finaliza a query apontando para o usuário correto
         query += " WHERE id = ?"
         params.append(usuario_id)
         
-        # CORREÇÃO: Usamos o get_db() em vez de db.conectar()
         with get_db() as conexao:
             conexao.execute(query, tuple(params))
             conexao.commit()
+
     @staticmethod
-    def atualizar(usuario_id, nome, email, senha, admin, assinatura_filename=None):
-        query = "UPDATE usuarios SET nome = ?, email = ?, admin = ?"
-        params = [nome, email, admin]
-        
+    def atualizar(usuario_id, nome, email, cargo, crm_coren, senha, admin, assinatura_filename=None):
+        query = "UPDATE usuarios SET nome = ?, email = ?, cargo = ?, admin = ?"
+        params = [nome, email, cargo, admin]
+
+        if crm_coren is not None:
+            encrypted_crm = en(crm_coren)
+            crm_tag = crm_coren_tag(crm_coren)
+            query += ", crm_coren = ?, crm_coren_tag = ?"
+            params.extend([encrypted_crm, crm_tag])
+
         if senha:
             hashed_senha = generate_password_hash(senha)
             query += ", senha = ?"
@@ -82,19 +85,44 @@ class Usuario:
     def listar_todos():
         with get_db() as conexao:
             cursor = conexao.execute("SELECT * FROM usuarios ORDER BY id ASC")
-            return cursor.fetchall()
+            usuarios = []
+            for row in cursor.fetchall():
+                usuario = dict(row)
+                usuario['crm_coren'] = de(usuario.get('crm_coren'))
+                usuarios.append(usuario)
+            return usuarios
 
     @staticmethod
     def email_existe(email):
         return Usuario.buscar_por_email(email) is not None
 
     @staticmethod
-    def autenticar(login_id, senha):
+    def crm_coren_existe(crm_coren, exclude_id=None):
+        if not crm_coren or str(crm_coren).strip() == "":
+            return False
+        tag = crm_coren_tag(crm_coren)
+        if not tag:
+            return False
         with get_db() as conexao:
-            # Permite login por email ou por CRM/COREN
-            cursor = conexao.execute("SELECT * FROM usuarios WHERE email = ? OR crm_coren = ?", (login_id, login_id))
+            if exclude_id:
+                cursor = conexao.execute("SELECT id FROM usuarios WHERE crm_coren_tag = ? AND id != ?", (tag, exclude_id))
+            else:
+                cursor = conexao.execute("SELECT id FROM usuarios WHERE crm_coren_tag = ?", (tag,))
+            return cursor.fetchone() is not None
+
+    @staticmethod
+    def autenticar(login_id, senha):
+        login_id = str(login_id or "").strip()
+        tag = crm_coren_tag(login_id)
+        with get_db() as conexao:
+            if tag:
+                cursor = conexao.execute("SELECT * FROM usuarios WHERE email = ? OR crm_coren_tag = ?", (login_id, tag))
+            else:
+                cursor = conexao.execute("SELECT * FROM usuarios WHERE email = ?", (login_id,))
             usuario = cursor.fetchone()
 
             if usuario and check_password_hash(usuario['senha'], senha):
-                return dict(usuario) # Devolve os dados limpos para a Sessão
+                usuario = dict(usuario)
+                usuario['crm_coren'] = de(usuario.get('crm_coren'))
+                return usuario
             return None
